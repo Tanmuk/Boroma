@@ -1,0 +1,1 @@
+export default function P(){return(<main className='container py-16'><h1>Privacy</h1><p className='mt-4 text-slate-700'>We collect only what we need: contact info, call metadata, and step recaps. We never sell data. You can request deletion anytime.</p></main>)}

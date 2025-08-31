@@ -1,0 +1,1 @@
+export default function F(){return(<main className='container py-16'><h1>Fair Use Policy</h1><p className='mt-4 text-slate-700'>To keep lines open, we remind at 25 minutes and end calls at 35 minutes. Unlimited Support covers typical household tech issues. Abusive use may be limited.</p></main>)}

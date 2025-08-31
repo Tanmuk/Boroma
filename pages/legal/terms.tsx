@@ -1,0 +1,1 @@
+export default function T(){return(<main className='container py-16'><h1>Terms of Service</h1><p className='mt-4 text-slate-700'>We provide guidance only. We never ask for passwords or one-time codes. Calls may be recorded for quality. Availability may vary.</p></main>)}

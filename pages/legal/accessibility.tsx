@@ -1,0 +1,1 @@
+export default function A(){return(<main className='container py-16'><h1>Accessibility</h1><p className='mt-4 text-slate-700'>We aim for WCAG 2.1 AA. Report issues to support@boroma.io.</p></main>)}
