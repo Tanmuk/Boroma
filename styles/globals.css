@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+html, body { height: 100%; }
+body { @apply text-slate-900 bg-gradient-to-b from-[#E4EEF0]/60 to-white antialiased; }
+.container { @apply mx-auto max-w-[1200px] px-4; }
+
+/* Buttons */
+.btn { @apply inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition; }
+.btn-primary { @apply text-white bg-gradient-to-b from-[#FF8A3D] to-[#FF5B04]; }
+.btn-primary:hover { box-shadow: 0 0 18px rgba(255,91,4,.45); }
+.btn-outline { @apply bg-white border border-slate-200 text-[#FF5B04] hover:bg-slate-50; }
+.btn-link { @apply text-[#FF5B04] font-semibold hover:opacity-90; }
+
+/* Cards */
+.card { @apply rounded-2xl border border-slate-200 bg-white; } /* no global shadow */
+
+/* Headings */
+h1 { @apply font-semibold tracking-tight text-4xl md:text-6xl leading-tight; }
+h2 { @apply font-semibold tracking-tight text-2xl md:text-4xl; }
+h3 { @apply font-semibold tracking-tight text-xl md:text-2xl; }
+
+/* Mona Sans (optional local) with safe fallbacks */
+@font-face{
+  font-family: "Mona Sans";
+  src: local("Mona Sans");
+  font-weight: 800; font-stretch: 125%;
+  font-display: swap;
+}
+.logo-type{
+  font-family: "Mona Sans", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 800; letter-spacing: .2px;
+}
+
+/* Eyebrow banner */
+.eyebrow { @apply inline-flex items-center gap-2 text-xs font-semibold rounded-full px-3 py-1 bg-[#FFE6D6] text-[#A43C00] border border-[#FFC9AC]; }
