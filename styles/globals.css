@@ -2,10 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Light theme */
 :root { color-scheme: light; }
 html, body { height: 100%; }
-body { @apply text-slate-900 bg-gradient-to-b from-[#E4EEF0]/60 to-white antialiased; }
+/* Replace bluish bg with warm #fcdd9d → white */
+body { @apply text-slate-900 bg-gradient-to-b from-[#fcdd9d]/50 to-white antialiased; }
 .container { @apply mx-auto max-w-[1200px] px-4; }
+
+/* Mona Sans Expanded Bold for logo, headings, buttons */
+@font-face{
+  font-family: "Mona Sans";
+  font-style: normal;
+  font-weight: 800;
+  font-stretch: 125%;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/gh/github/mona-sans/fonts/Mona-Sans.woff2") format("woff2");
+}
+.logo-type,
+h1, h2, h3,
+.btn { font-family: "Mona Sans", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
 /* Buttons */
 .btn { @apply inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition; }
@@ -22,17 +37,12 @@ h1 { @apply font-semibold tracking-tight text-4xl md:text-6xl leading-tight; }
 h2 { @apply font-semibold tracking-tight text-2xl md:text-4xl; }
 h3 { @apply font-semibold tracking-tight text-xl md:text-2xl; }
 
-/* Mona Sans (optional local) with safe fallbacks */
-@font-face{
-  font-family: "Mona Sans";
-  src: local("Mona Sans");
-  font-weight: 800; font-stretch: 125%;
-  font-display: swap;
-}
-.logo-type{
-  font-family: "Mona Sans", Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  font-weight: 800; letter-spacing: .2px;
-}
-
-/* Eyebrow banner */
+/* Eyebrow badge */
 .eyebrow { @apply inline-flex items-center gap-2 text-xs font-semibold rounded-full px-3 py-1 bg-[#FFE6D6] text-[#A43C00] border border-[#FFC9AC]; }
+
+/* Section label, always orange */
+.section-label { @apply text-xs uppercase tracking-wide font-semibold text-[#FF5B04]; }
+
+/* Simple mobile menu panel */
+.mobile-panel { @apply absolute top-full left-0 right-0 bg-white border-b border-slate-200 md:hidden; }
+.mobile-link { @apply block px-4 py-3 text-sm text-slate-700; }
