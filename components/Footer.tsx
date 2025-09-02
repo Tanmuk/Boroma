@@ -6,14 +6,15 @@ export default function Footer(){
       <div className="container py-10 text-sm text-slate-600 grid md:grid-cols-2 gap-6">
         <div>
           <div className="logo-type text-slate-900 text-lg">Boroma</div>
-          <div>On-demand, phone-first tech support for seniors.</div>
+          <div>On demand, phone first tech support for seniors</div>
         </div>
         <div className="flex items-center md:justify-end gap-6">
           <Link href="/what-we-solve">What we solve</Link>
           <a href="/#pricing">Pricing</a>
           <a href="/#faq">FAQ</a>
-          <a href="mailto:support@boroma.io">Contact</a>
-          <Link href="/legal/privacy">Privacy</Link>
+          <a href="mailto:hello@boroma.site">Contact</a>
+          <Link href="/legal/terms">Terms of Service</Link>
+          <Link href="/legal/privacy">Privacy Policy</Link>
         </div>
       </div>
     </footer>
