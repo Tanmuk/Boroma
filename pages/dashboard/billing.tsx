@@ -8,7 +8,6 @@ export default function Billing(){
         <div className="card p-6 mt-6">
           <div className="text-slate-700">Manage payment method, change plan, or cancel anytime.</div>
           <a href={portal} className="btn btn-primary mt-4">Open billing portal</a>
-          <div className=
         </div>
       </main>
     </Protected>
