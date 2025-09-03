@@ -2,31 +2,42 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).end()
-  const sig = req.headers['x-boroma-signature'] as string | undefined
-  if (process.env.VAPI_WEBHOOK_SECRET && sig !== process.env.VAPI_WEBHOOK_SECRET) {
-    return res.status(401).json({ error: 'Invalid signature' })
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' })
+
+  const secret = process.env.VAPI_WEBHOOK_SECRET
+  const provided = req.headers['x-boroma-secret'] as string | undefined
+  if (!secret || !provided || provided !== secret) {
+    return res.status(401).json({ ok: false, error: 'Invalid webhook secret' })
   }
+
+  const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {}
+
+  // Always log the raw event so you can see payloads in Supabase
+  await supabaseAdmin.from('webhook_event_logs').insert({
+    source: 'vapi',
+    payload: body
+  }).catch(()=>{})
+
+  // OPTIONAL: if your Vapi payload has caller phone & duration, store a call record
   try {
-    const payload = req.body
-    await supabaseAdmin.from('webhook_event_logs').insert({ source: 'vapi', payload })
-    if (payload?.event === 'call.completed') {
+    const caller = body?.caller?.phone || body?.from || body?.phone || null
+    const seconds = body?.durationSeconds || body?.metrics?.durationSeconds || null
+
+    if (caller && seconds) {
+      // Find the owner by matching members.phone
+      const { data: member } = await supabaseAdmin
+        .from('members')
+        .select('user_id')
+        .eq('phone', caller)
+        .maybeSingle()
+
       await supabaseAdmin.from('calls').insert({
-        user_id: payload.user_id || null,
-        phone: payload.phone,
-        started_at: payload.started_at,
-        ended_at: payload.ended_at,
-        duration_seconds: payload.duration_seconds,
-        issue_type: payload.issue_type,
-        resolved: payload.resolved,
-        recording_url: payload.recording_url,
-        transcript_url: payload.transcript_url,
-        cost_cents: payload.cost_cents,
-        source: 'vapi'
+        user_id: member?.user_id ?? null,
+        from_phone: caller,
+        seconds
       })
     }
-    return res.json({ ok: true })
-  } catch (e: any) {
-    console.error(e); return res.status(500).json({ error: 'Webhook error' })
-  }
+  } catch {}
+
+  return res.json({ ok: true })
 }
