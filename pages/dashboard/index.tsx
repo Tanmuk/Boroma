@@ -1,122 +1,124 @@
-import Protected from '@/components/Protected'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
-type Call = { id:string; user_id:string|null; phone:string|null; started_at:string; ended_at:string|null; duration_seconds:number|null; issue_type:string|null; resolved:boolean|null }
-type Member = { id:string; name:string; phone:string; relationship:string|null }
+type SubRow = {
+  status: string | null
+  current_period_end: string | null
+  plan: string | null
+}
+type Member = { id: string; name: string; phone: string }
 
 export default function Dashboard(){
-  const [calls,setCalls]=useState<Call[]>([])
-  const [members,setMembers]=useState<Member[]>([])
-  const [plan,setPlan]=useState<string>('Unlimited Support')
-  const [status,setStatus]=useState<string>('inactive')
-  const [minutesMonth,setMinutesMonth]=useState<number>(0)
-  const [totalCallsMonth,setTotalCallsMonth]=useState<number>(0)
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [sub, setSub] = useState<SubRow | null>(null)
+  const [members, setMembers] = useState<Member[]>([])
+  const [mName, setMName] = useState('')
+  const [mPhone, setMPhone] = useState('')
+  const phone = process.env.NEXT_PUBLIC_PRIMARY_PHONE || '+1-555-0100'
 
-  useEffect(()=>{(async()=>{
-    const { data:{ user } } = await supabase.auth.getUser(); if(!user) return
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { window.location.href = '/login'; return }
+      setUserId(user.id)
 
-    const { data: subs } = await supabase.from('subscriptions')
-      .select('status, plan, current_period_end').eq('user_id', user.id).order('current_period_end', { ascending:false }).limit(1)
-    if (subs && subs.length>0) { setPlan(subs[0].plan || 'Unlimited Support'); setStatus(subs[0].status || 'inactive') }
+      // subscription status
+      const { data: subs } = await supabase
+        .from('subscriptions')
+        .select('status,current_period_end,plan')
+        .eq('user_id', user.id)
+        .order('current_period_end', { ascending: false })
+        .limit(1)
+      setSub(subs?.[0] ?? null)
 
-    const { data: callsData } = await supabase.from('calls').select('*').eq('user_id', user.id).order('started_at', { ascending:false })
-    setCalls(callsData||[])
+      // members list
+      await refreshMembers(user.id)
 
-    const { data: mins } = await supabase.rpc('minutes_used_current_month')
-    setMinutesMonth((mins as number)||0)
+      setLoading(false)
+    })()
+  }, [])
 
-    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0,0,0,0)
-    setTotalCallsMonth((callsData||[]).filter(c => new Date(c.started_at) >= monthStart).length)
+  async function refreshMembers(uid: string){
+    const { data } = await supabase.from('members').select('id,name,phone').eq('user_id', uid).order('created_at', { ascending: true })
+    setMembers(data || [])
+  }
 
-    const { data: mems } = await supabase.from('members').select('*').eq('user_id', user.id).order('created_at', { ascending:false })
-    setMembers(mems||[])
-  })()},[])
+  async function addMember(e:any){
+    e.preventDefault()
+    if (!userId) return
+    const cleaned = mPhone.replace(/[^\d+]/g, '')
+    if (!/^\+?\d{10,15}$/.test(cleaned)) { alert('Enter a valid phone'); return }
+    const { error } = await supabase.from('members').insert({ user_id: userId, name: mName || 'Family member', phone: cleaned })
+    if (!error){ setMName(''); setMPhone(''); refreshMembers(userId) }
+  }
 
-  const memberStats = useMemo(()=>{
-    const byPhone = new Map<string,{minutes:number,last?:string,scamCount:number,callCount:number}>()
-    for (const m of members){ byPhone.set(m.phone, {minutes:0, last:undefined, scamCount:0, callCount:0}) }
-    for (const c of calls){
-      const p = c.phone||''; if(!byPhone.has(p)) continue
-      const entry = byPhone.get(p)!
-      entry.minutes += Math.round(((c.duration_seconds||0)/60))
-      entry.callCount += 1
-      if (!entry.last || new Date(c.started_at) > new Date(entry.last)) entry.last = c.started_at
-      if ((c.issue_type||'').toLowerCase().includes('scam')) entry.scamCount += 1
-    }
-    return byPhone
-  },[calls, members])
+  async function removeMember(id: string){
+    if (!userId) return
+    await supabase.from('members').delete().eq('id', id).eq('user_id', userId)
+    refreshMembers(userId)
+  }
+
+  const active = sub?.status === 'active' || sub?.status === 'trialing'
+
+  if (loading) return <main className="container py-16"><div className="card p-6">Loading…</div></main>
 
   return (
-    <Protected>
-      <main className="container py-10">
-        <h1>Dashboard</h1>
-        <div className="grid md:grid-cols-4 gap-6 mt-6">
-          <div className="card p-6">
-            <div className="text-sm text-slate-500">Plan</div>
-            <div className="text-2xl font-semibold">{plan}</div>
-            <div className="text-xs text-slate-500">Status: {status}</div>
-          </div>
-          <div className="card p-6">
-            <div className="text-sm text-slate-500">Minutes used this month</div>
-            <div className="text-3xl font-semibold">{minutesMonth} min</div>
-            <div className="text-xs text-slate-500">Friendly reminder at 25 min, cap at 35 min per call.</div>
-          </div>
-          <div className="card p-6">
-            <div className="text-sm text-slate-500">Total calls this month</div>
-            <div className="text-3xl font-semibold">{totalCallsMonth}</div>
-            <div className="text-xs text-slate-500">Includes every member on your plan.</div>
-          </div>
-          <a href="/dashboard/billing" className="card p-6 hover:bg-slate-50">
-            <div className="text-sm text-slate-500">Billing</div>
-            <div className="text-3xl font-semibold">Manage</div>
-            <div className="text-xs text-slate-500">Update payment & switch plans</div>
-          </a>
+    <main className="container py-8 space-y-10">
+      {/* Top banner with number and magnet */}
+      <section className="card p-6">
+        <div className="text-sm text-slate-600">Your support number</div>
+        <div className="text-3xl md:text-4xl font-extrabold" style={{color:'#FF5B04'}}>{phone}</div>
+        <div className="mt-3 flex gap-3">
+          <a className="btn btn-primary" href="/api/fridge-magnet">Download fridge magnet</a>
+          <span className="text-sm text-slate-500 self-center">Print and stick on the fridge</span>
         </div>
+      </section>
 
-        <h2 className="mt-10">Loved ones</h2>
-        <div className="mt-4 grid md:grid-cols-2 gap-4">
-          {members.length===0? <div className="text-slate-500">No members yet. Add them on the Members page.</div> :
-            members.map(m => {
-              const s = memberStats.get(m.phone) || { minutes:0, last: undefined, scamCount:0, callCount:0 }
-              return (
-                <div key={m.id} className="card p-5">
-                  <div className="flex justify-between">
-                    <div>
-                      <div className="font-medium">{m.name} <span className="text-slate-400 text-sm">({m.relationship||'member'})</span></div>
-                      <div className="text-sm text-slate-500">{m.phone}</div>
-                    </div>
-                    <div className="text-right text-sm">
-                      <div><b>{s.minutes}</b> min used</div>
-                      <div>{s.callCount} calls</div>
-                      <div className={s.scamCount>0?'text-red-600':'text-slate-500'}>{s.scamCount} scam checks</div>
-                    </div>
+      {/* Plan status */}
+      <section className="card p-6">
+        <h2>Plan</h2>
+        <p className="mt-2">
+          Status: <b className={active ? 'text-green-700' : 'text-red-700'}>{active ? 'Active' : 'Inactive'}</b>
+        </p>
+        {sub?.current_period_end && (
+          <p className="text-slate-600 mt-1 text-sm">
+            Renews: {new Date(sub.current_period_end).toLocaleDateString()}
+          </p>
+        )}
+        <div className="mt-4">
+          <a className="btn btn-outline" href={process.env.NEXT_PUBLIC_STRIPE_PORTAL_URL || '#'}>Open billing portal</a>
+        </div>
+      </section>
+
+      {/* Members management */}
+      <section className="card p-6">
+        <h2>Members</h2>
+        <p className="text-slate-600 mt-1">Add the phone numbers that are allowed unlimited support</p>
+        <form onSubmit={addMember} className="mt-4 grid md:grid-cols-[1fr_280px_auto] gap-3">
+          <input className="border rounded-xl p-3" placeholder="Name" value={mName} onChange={e=>setMName(e.target.value)} />
+          <input className="border rounded-xl p-3" placeholder="Phone e.g. +15550100" value={mPhone} onChange={e=>setMPhone(e.target.value)} />
+          <button className="btn btn-primary">Add member</button>
+        </form>
+
+        <div className="mt-4">
+          {members.length === 0 ? (
+            <div className="text-slate-600">No members yet</div>
+          ) : (
+            <ul className="divide-y divide-slate-200">
+              {members.map(m => (
+                <li key={m.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold">{m.name || 'Member'}</div>
+                    <div className="text-sm text-slate-600">{m.phone}</div>
                   </div>
-                  <div className="text-xs text-slate-500 mt-2">Last call: {s.last? new Date(s.last).toLocaleString() : '—'}</div>
-                </div>
-              )
-            })
-          }
+                  <button className="btn btn-outline" onClick={()=>removeMember(m.id)}>Remove</button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-
-        <h2 className="mt-10">Recent calls</h2>
-        <div className="mt-4 grid gap-3">
-          {calls.length===0? <div className="text-slate-500">No calls yet.</div> :
-            calls.slice(0,8).map(c => (
-              <div key={c.id} className="card p-5 flex justify-between">
-                <div>
-                  <div className="font-medium">{c.issue_type || 'General help'}</div>
-                  <div className="text-sm text-slate-500">{new Date(c.started_at).toLocaleString()} • {c.phone||'unknown'}</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm">{c.duration_seconds?Math.round(c.duration_seconds/60):0} min</div>
-                  <div className="text-xs text-slate-500">{c.resolved?'Resolved':'Pending'}</div>
-                </div>
-              </div>
-            ))
-          }
-        </div>
-      </main>
-    </Protected>
+      </section>
+    </main>
   )
 }
