@@ -1,5 +1,5 @@
 export default function Pricing(){
-  const annual = 243
+  const annual = 348
   return (
     <main className="container py-16">
       <h1>Simple pricing</h1>
