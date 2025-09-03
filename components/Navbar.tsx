@@ -6,10 +6,8 @@ export default function Navbar(){
   return (
     <header className="bg-transparent relative">
       <div className="container flex items-center justify-between h-16">
-        {/* Logotype only, Mona Sans Expanded Bold */}
         <Link href="/" className="logo-type text-xl md:text-2xl">Boroma</Link>
 
-        {/* Desktop nav */}
         <nav className="hidden md:flex gap-6 text-sm font-medium text-slate-700">
           <a href="/#how-it-works">How it works</a>
           <Link href="/what-we-solve">What we solve</Link>
@@ -18,11 +16,11 @@ export default function Navbar(){
           <Link href="/login">Log in</Link>
         </nav>
 
-        {/* CTA */}
+        {/* Main CTA now scrolls to Pricing */}
         <div className="hidden md:flex">
-          <Link href="/signup" className="btn btn-primary hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]">
+          <a href="/#pricing" className="btn btn-primary hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]">
             Unlock unlimited support
-          </Link>
+          </a>
         </div>
 
         {/* Mobile hamburger */}
@@ -31,14 +29,12 @@ export default function Navbar(){
           className="md:hidden p-2 text-slate-700"
           onClick={()=>setOpen(v=>!v)}
         >
-          {/* Hamburger icon */}
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
             <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
           </svg>
         </button>
       </div>
 
-      {/* Mobile panel */}
       {open && (
         <div className="mobile-panel">
           <a className="mobile-link" href="/#how-it-works" onClick={()=>setOpen(false)}>How it works</a>
@@ -47,9 +43,9 @@ export default function Navbar(){
           <a className="mobile-link" href="/#faq" onClick={()=>setOpen(false)}>FAQ</a>
           <Link className="mobile-link" href="/login" onClick={()=>setOpen(false)}>Log in</Link>
           <div className="px-4 py-3">
-            <Link href="/signup" className="btn btn-primary w-full text-center hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]">
+            <a href="/#pricing" className="btn btn-primary w-full text-center hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]">
               Unlock unlimited support
-            </Link>
+            </a>
           </div>
         </div>
       )}
