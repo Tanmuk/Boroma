@@ -20,9 +20,9 @@ export default function Navbar() {
       <div className="container flex items-center justify-between h-16">
         <Link href="/" className="flex items-center gap-2" aria-label="Boroma home">
           <Image
-            src="/Boroma-logotype.png"
+            src="/Boroma logo.svg"
             alt="Boroma"
-            width={120}
+            width={80}
             height={28}
             priority
             className="h-7 w-auto"
