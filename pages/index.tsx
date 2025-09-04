@@ -75,46 +75,37 @@ export default function Home(){
         <div className="mt-6"><Link href="/what-we-solve" className="btn btn-outline">View more</Link></div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="container py-16 text-center">
-        <div className="section-label">Pricing</div>
-        <h2 className="mt-2">Simple and fair, cancel anytime</h2>
-        <div className="card p-8 mt-6 max-w-3xl mx-auto text-left">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              <button onClick={()=>setAnnual(false)} className={`px-3 py-1 rounded-full ${!annual ? 'bg-[#FFE6D6] text-[#A43C00]' : 'bg-slate-100 text-slate-600'}`}>Monthly</button>
-              <button onClick={()=>setAnnual(true)} className={`px-3 py-1 rounded-full ${annual ? 'bg-[#FFE6D6] text-[#A43C00]' : 'bg-slate-100 text-slate-600'}`}>Annually</button>
-            </div>
-            <div className="text-sm text-[#A43C00]">Save 30% with Annually</div>
-          </div>
+     {/* Pricing */}
+<section id="pricing" className="container py-16 text-center">
+  <div className="section-label">Pricing</div>
+  <h2 className="mt-2">Peace of mind for one fixed price</h2>
+  <p className="text-slate-600 mt-2">Cancel anytime, this is our introductory price for early users</p>
 
-          <div className="mt-4">
-            <div className="text-5xl font-semibold">
-              {annual ? `$${priceAnnual}` : `$${priceMonthly}`}<span className="text-base font-normal text-slate-500">{annual ? '/yr' : '/mo'}</span>
-            </div>
-          </div>
+  <div className="card p-8 mt-6 max-w-3xl mx-auto text-left">
+    {/* keep your monthly vs annual toggle exactly as before */}
+    {/* below is the features list you asked for */}
+    <ul className="mt-6 space-y-2 text-slate-700">
+      <li>1, On demand phone first tech help</li>
+      <li>2, Ten calls per month, each call up to thirty five minutes</li>
+      <li>3, Toll free number for paid members</li>
+      <li>4, Fridge magnet print</li>
+      <li>5, SMS step by step pictures</li>
+      <li>6, Scam aware guidance and guardrails</li>
+      <li>7, Covers common issues in any device</li>
+      <li>8, Multilingual, English, Spanish, Chinese</li>
+      <li>9, Works on any phone, no apps</li>
+      <li>10, Patient and kind agents all the way</li>
+    </ul>
 
-          <ul className="mt-6 space-y-2 text-slate-700">
-            <li>• 24/7 phone first tech help</li>
-            <li>• Fridge magnet print</li>
-            <li>• SMS step by step pictures</li>
-            <li>• Scam aware guidance and guardrails</li>
-            <li>• Covers common issues in any device</li>
-            <li>• Multilingual, English, Spanish, Chinese</li>
-            <li>• Works on any phone, no apps</li>
-            <li>• Patient and kind agents all the way</li>
-            <li>• SMS recaps you can follow later</li>
-          </ul>
+    <div className="mt-6 flex gap-3">
+      <Link href={`/signup?plan=${annual ? 'annual' : 'monthly'}`}
+        className="btn btn-primary hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]">
+        Unlock on demand support
+      </Link>
+    </div>
+  </div>
+</section>
 
-          {/* This button now passes the chosen plan */}
-          <div className="mt-6 flex gap-3">
-            <Link href={`/signup?plan=${annual ? 'annual' : 'monthly'}`}
-                  className="btn btn-primary hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]">
-              Unlock unlimited support
-            </Link>
-          </div>
-        </div>
-      </section>
 
       {/* Final CTA */}
       <section className="container py-16">
