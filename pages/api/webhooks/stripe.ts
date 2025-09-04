@@ -34,6 +34,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const sub = event.data.object as Stripe.Subscription
       const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
       const userId = (sub.metadata?.user_id as string) || null
+      const item = sub.items.data[0]
+      const quantity = item?.quantity ?? 1  // <-- seats
 
       await supabaseAdmin.from('subscriptions').upsert({
         user_id: userId,
@@ -43,31 +45,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
         current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
         cancel_at_period_end: sub.cancel_at_period_end,
-        plan: sub.items.data[0]?.price?.id || null
+        plan: item?.price?.id || null,
+        seat_count: quantity,                 // <-- store seats
       }, { onConflict: 'stripe_subscription_id' })
 
-      // Best-effort email (Stripe also sends its own receipts if enabled)
+      // Best-effort email (optional)
       try {
         const cust = await stripe.customers.retrieve(customerId)
         const email = (cust as any)?.email
-        if (email) {
-          if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
-            await sendEmail(email, 'Your Boroma subscription is active', `
-              <p>Thanks for subscribing to Boroma. Your plan is now active.</p>
-              <p><a href="https://www.boroma.site/dashboard">Open your dashboard</a></p>
-            `)
-          }
-          if (event.type === 'customer.subscription.deleted') {
-            await sendEmail(email, 'Your Boroma subscription is cancelled', `
-              <p>Your subscription was cancelled. You can restart any time.</p>
-            `)
-          }
+        if (email && (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated')) {
+          await sendEmail(email, 'Your Boroma subscription is active', `<p>Your plan is active.</p><p><a href="https://www.boroma.site/dashboard">Open your dashboard</a></p>`)
         }
       } catch {}
-    }
-
-    if (event.type === 'checkout.session.completed') {
-      // no-op; subscription events handle status
     }
 
     return res.json({ received: true })
