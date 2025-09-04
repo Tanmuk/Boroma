@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 type SubRow = {
@@ -7,15 +7,18 @@ type SubRow = {
   plan: string | null
 }
 type Member = { id: string; name: string; phone: string }
+type CallRow = { id: string; seconds: number | null; created_at: string }
 
 export default function Dashboard(){
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [sub, setSub] = useState<SubRow | null>(null)
   const [members, setMembers] = useState<Member[]>([])
+  const [calls, setCalls] = useState<CallRow[]>([])
   const [mName, setMName] = useState('')
   const [mPhone, setMPhone] = useState('')
   const phone = process.env.NEXT_PUBLIC_PRIMARY_PHONE || '+1-555-0100'
+  const portal = process.env.NEXT_PUBLIC_STRIPE_PORTAL_URL || 'https://billing.stripe.com/p/login/5kA7tX49H7PNbAs288'
 
   useEffect(() => {
     (async () => {
@@ -23,7 +26,6 @@ export default function Dashboard(){
       if (!user) { window.location.href = '/login'; return }
       setUserId(user.id)
 
-      // subscription status
       const { data: subs } = await supabase
         .from('subscriptions')
         .select('status,current_period_end,plan')
@@ -32,8 +34,8 @@ export default function Dashboard(){
         .limit(1)
       setSub(subs?.[0] ?? null)
 
-      // members list
       await refreshMembers(user.id)
+      await refreshCalls(user.id)
 
       setLoading(false)
     })()
@@ -44,6 +46,11 @@ export default function Dashboard(){
     setMembers(data || [])
   }
 
+  async function refreshCalls(uid: string){
+    const { data } = await supabase.from('calls').select('id,seconds,created_at').eq('user_id', uid).order('created_at', { ascending: false })
+    setCalls(data || [])
+  }
+
   async function addMember(e:any){
     e.preventDefault()
     if (!userId) return
@@ -52,20 +59,26 @@ export default function Dashboard(){
     const { error } = await supabase.from('members').insert({ user_id: userId, name: mName || 'Family member', phone: cleaned })
     if (!error){ setMName(''); setMPhone(''); refreshMembers(userId) }
   }
-
   async function removeMember(id: string){
     if (!userId) return
     await supabase.from('members').delete().eq('id', id).eq('user_id', userId)
     refreshMembers(userId)
   }
 
-  const active = sub?.status === 'active' || sub?.status === 'trialing'
+  // Analytics
+  const totalCalls = calls.length
+  const totalMinutes = useMemo(() => Math.round(calls.reduce((s,c)=>s+(c.seconds||0),0)/60), [calls])
+  const monthMinutes = useMemo(() => {
+    const first = new Date(); first.setDate(1); first.setHours(0,0,0,0)
+    return Math.round(calls.filter(c => new Date(c.created_at) >= first).reduce((s,c)=>s+(c.seconds||0),0)/60)
+  }, [calls])
 
+  const active = sub?.status === 'active' || sub?.status === 'trialing'
   if (loading) return <main className="container py-16"><div className="card p-6">Loading…</div></main>
 
   return (
     <main className="container py-8 space-y-10">
-      {/* Top banner with number and magnet */}
+      {/* Support number + magnet */}
       <section className="card p-6">
         <div className="text-sm text-slate-600">Your support number</div>
         <div className="text-3xl md:text-4xl font-extrabold" style={{color:'#FF5B04'}}>{phone}</div>
@@ -75,23 +88,25 @@ export default function Dashboard(){
         </div>
       </section>
 
-      {/* Plan status */}
+      {/* Plan */}
       <section className="card p-6">
         <h2>Plan</h2>
-        <p className="mt-2">
-          Status: <b className={active ? 'text-green-700' : 'text-red-700'}>{active ? 'Active' : 'Inactive'}</b>
-        </p>
-        {sub?.current_period_end && (
-          <p className="text-slate-600 mt-1 text-sm">
-            Renews: {new Date(sub.current_period_end).toLocaleDateString()}
-          </p>
-        )}
-        <div className="mt-4">
-          <a className="btn btn-outline" href={process.env.NEXT_PUBLIC_STRIPE_PORTAL_URL || '#'}>Open billing portal</a>
+        <p className="mt-2">Status: <b className={active ? 'text-green-700' : 'text-red-700'}>{active ? 'Active' : 'Inactive'}</b></p>
+        {sub?.current_period_end && (<p className="text-slate-600 mt-1 text-sm">Renews: {new Date(sub.current_period_end).toLocaleDateString()}</p>)}
+        <div className="mt-4"><a className="btn btn-outline" href={portal}>Open billing portal</a></div>
+      </section>
+
+      {/* Analytics */}
+      <section className="card p-6">
+        <h2>Analytics</h2>
+        <div className="grid md:grid-cols-3 gap-4 mt-3">
+          <div className="border rounded-xl p-4"><div className="text-sm text-slate-600">Calls this month</div><div className="text-2xl font-semibold">{calls.filter(c => new Date(c.created_at).getMonth() === new Date().getMonth()).length}</div></div>
+          <div className="border rounded-xl p-4"><div className="text-sm text-slate-600">Minutes this month</div><div className="text-2xl font-semibold">{monthMinutes}</div></div>
+          <div className="border rounded-xl p-4"><div className="text-sm text-slate-600">Total minutes</div><div className="text-2xl font-semibold">{totalMinutes}</div></div>
         </div>
       </section>
 
-      {/* Members management */}
+      {/* Members */}
       <section className="card p-6">
         <h2>Members</h2>
         <p className="text-slate-600 mt-1">Add the phone numbers that are allowed unlimited support</p>
@@ -100,18 +115,12 @@ export default function Dashboard(){
           <input className="border rounded-xl p-3" placeholder="Phone e.g. +15550100" value={mPhone} onChange={e=>setMPhone(e.target.value)} />
           <button className="btn btn-primary">Add member</button>
         </form>
-
         <div className="mt-4">
-          {members.length === 0 ? (
-            <div className="text-slate-600">No members yet</div>
-          ) : (
+          {members.length === 0 ? <div className="text-slate-600">No members yet</div> : (
             <ul className="divide-y divide-slate-200">
               {members.map(m => (
                 <li key={m.id} className="py-3 flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">{m.name || 'Member'}</div>
-                    <div className="text-sm text-slate-600">{m.phone}</div>
-                  </div>
+                  <div><div className="font-semibold">{m.name || 'Member'}</div><div className="text-sm text-slate-600">{m.phone}</div></div>
                   <button className="btn btn-outline" onClick={()=>removeMember(m.id)}>Remove</button>
                 </li>
               ))}
