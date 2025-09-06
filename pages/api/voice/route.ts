@@ -76,16 +76,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).send(twiml(`<Say voice="alice">${msg}</Say>`))
   }
 
-  // Allowed: short disclosure, 35-min cap, status callbacks for logging.
-  // We also attach metadata in the callback URL so we can log who this belongs to.
-  const cb = `/api/voice/status?user=${member.user_id}&member=${member.id}&source=tollfree&memberCall=1`
-  const xml = `
-    <Say voice="alice">Connecting you to Boroma. This call may be recorded for quality and safety. At twenty five minutes we will remind you there are ten minutes left.</Say>
-    <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="2100" method="POST"
-          statusCallback="${cb}"
-          statusCallbackEvent="initiated ringing answered completed">
-      ${agent}
-    </Dial>
-  `
-  return res.status(200).send(twiml(xml))
+  // Allowed: 25-min leg, say reminder, then 10-min leg.
+// We keep your status callbacks for logging limits.
+const cbBase = `/api/voice/status?user=${member.user_id}&member=${member.id}&source=tollfree&memberCall=1`
+const xml = `
+  <Say voice="alice">
+    Connecting you to Boroma, this call may be recorded for quality and safety.
+  </Say>
+
+  <!-- First 25 minutes -->
+  <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="1500" method="POST"
+        statusCallback="${cbBase}&leg=1"
+        statusCallbackEvent="initiated ringing answered completed">
+    ${agent}
+  </Dial>
+
+  <!-- Soft reminder -->
+  <Say voice="alice">You have ten minutes remaining on this call. Let's fix this quickly,</Say>
+
+  <!-- Final 10 minutes -->
+  <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="600" method="POST"
+        statusCallback="${cbBase}&leg=2"
+        statusCallbackEvent="initiated ringing answered completed">
+    ${agent}
+  </Dial>
+`
+return res.status(200).send(twiml(xml))
+
 }
