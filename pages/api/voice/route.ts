@@ -1,4 +1,3 @@
-// /pages/api/voice/route.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
@@ -9,11 +8,9 @@ function norm(n?: string) {
   if (d.length === 10) return `+1${d}`
   return `+${d}`
 }
-
 function twiml(xml: string) {
   return `<?xml version="1.0" encoding="UTF-8"?><Response>${xml}</Response>`
 }
-
 function monthStartISO() {
   const d = new Date()
   d.setDate(1); d.setHours(0,0,0,0)
@@ -27,27 +24,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const from = norm((req.body?.From as string) || (req.query?.From as string))
   const tollfree = process.env.TWILIO_TOLLFREE as string
   const agent = process.env.VAPI_AGENT_NUMBER as string
-  const site = process.env.BOROMA_SITE || 'https://boroma.site'
-  if (!from || !agent) return res.status(200).send(twiml(`<Say>Sorry, we cannot take your call right now</Say>`))
+  const site = (process.env.BOROMA_SITE || 'https://boroma.site').replace(/^https?:\/\//, '')
+  if (!from || !agent || !tollfree) {
+    return res.status(200).send(twiml(`<Say>Sorry, we cannot take your call right now</Say>`))
+  }
 
-  // find member by caller id
+  // 1) Is caller a member?
   const { data: member } = await supabaseAdmin
     .from('members')
     .select('id,user_id,phone')
     .eq('phone', from)
     .maybeSingle()
 
-  // Non-member path → short message then forward to FREE line with 7-min cap
+  // Non-member → short message then forward to FREE Vapi line (TEST: 20s)
   if (!member) {
-    const msg = `This toll free line is for paid members. To join, visit ${site.replace('https://','').replace('http://','')}.`
+    const msg = `This toll free line is for paid members. To join, visit ${site}.`
     const xml = `
       <Say voice="alice">${msg}</Say>
-      <Dial callerId="${tollfree}" timeLimit="420">${agent}</Dial>
+      <Dial callerId="${tollfree}" timeLimit="20">${agent}</Dial>
     `
     return res.status(200).send(twiml(xml))
   }
 
-  // Check subscription status
+  // 2) Check subscription active
   const { data: sub } = await supabaseAdmin
     .from('subscriptions')
     .select('status')
@@ -57,12 +56,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .maybeSingle()
   const active = sub?.status === 'active' || sub?.status === 'trialing'
   if (!active) {
-    const msg = `Your plan is inactive. Please visit ${site.replace('https://','').replace('http://','')} to reactivate.`
-    const xml = `<Say voice="alice">${msg}</Say>`
-    return res.status(200).send(twiml(xml))
+    const msg = `Your plan is inactive. Please visit ${site} to reactivate.`
+    return res.status(200).send(twiml(`<Say voice="alice">${msg}</Say>`))
   }
 
-  // Monthly cap: 10 completed member calls this month
+  // 3) Enforce 10 calls per month (same as before)
   const { data: usedRows } = await supabaseAdmin
     .from('calls')
     .select('id')
@@ -72,35 +70,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .gte('created_at', monthStartISO())
   const used = usedRows?.length || 0
   if (used >= 10) {
-    const msg = `You have used your ten calls for this month. The counter resets next month.`
+    const msg = `You have used your ten calls for this month, the counter resets next month.`
     return res.status(200).send(twiml(`<Say voice="alice">${msg}</Say>`))
   }
 
-  // Allowed: 25-min leg, say reminder, then 10-min leg.
-// We keep your status callbacks for logging limits.
-const cbBase = `/api/voice/status?user=${member.user_id}&member=${member.id}&source=tollfree&memberCall=1`
-const xml = `
-  <Say voice="alice">
-    Connecting you to Boroma, this call may be recorded for quality and safety.
-  </Say>
+  // 4) TEST LIMITS: 30s leg, spoken reminder, then 20s leg
+  const cbBase = `/api/voice/status?user=${member.user_id}&member=${member.id}&source=tollfree&memberCall=1`
+  const xml = `
+    <Say voice="alice">Connecting you to Boroma, this call may be recorded for quality and safety.</Say>
 
-  <!-- First 25 minutes -->
-  <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="1500" method="POST"
-        statusCallback="${cbBase}&leg=1"
-        statusCallbackEvent="initiated ringing answered completed">
-    ${agent}
-  </Dial>
+    <!-- First short leg: 30 seconds -->
+    <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="30" method="POST"
+          statusCallback="${cbBase}&leg=1"
+          statusCallbackEvent="initiated ringing answered completed">
+      ${agent}
+    </Dial>
 
-  <!-- Soft reminder -->
-  <Say voice="alice">You have ten minutes remaining on this call. Let's fix this quickly,</Say>
+    <!-- Soft reminder -->
+    <Say voice="alice">You have ten minutes remaining on this call.</Say>
 
-  <!-- Final 10 minutes -->
-  <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="600" method="POST"
-        statusCallback="${cbBase}&leg=2"
-        statusCallbackEvent="initiated ringing answered completed">
-    ${agent}
-  </Dial>
-`
-return res.status(200).send(twiml(xml))
-
+    <!-- Final short leg: 20 seconds -->
+    <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="20" method="POST"
+          statusCallback="${cbBase}&leg=2"
+          statusCallbackEvent="initiated ringing answered completed">
+      ${agent}
+    </Dial>
+  `
+  return res.status(200).send(twiml(xml))
 }
