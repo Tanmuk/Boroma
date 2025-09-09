@@ -1,100 +1,46 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
+// app/api/voice/route.ts
+import { createClient } from '@supabase/supabase-js'
 
-function norm(n?: string) {
-  if (!n) return null
-  const d = n.replace(/[^\d+]/g, '')
-  if (d.startsWith('+')) return d
-  if (d.length === 10) return `+1${d}`
-  return `+${d}`
-}
-function twiml(xml: string) {
-  return `<?xml version="1.0" encoding="UTF-8"?><Response>${xml}</Response>`
-}
-function monthStartISO() {
-  const d = new Date()
-  d.setDate(1); d.setHours(0,0,0,0)
-  return d.toISOString()
-}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!  // server-only
+const VAPI_AGENT_NUMBER = '+13392091065'                    // Stella (Vapi)
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).end()
-  res.setHeader('Content-Type', 'text/xml')
+export async function POST(req: Request) {
+  // Twilio posts x-www-form-urlencoded -> use formData()
+  const fd = await req.formData()
+  const from = (fd.get('From') as string) || ''
+  const caller = from.replace(/^tel:/, '').replace(/\D/g, '') // normalize to digits only
 
-  const from = norm((req.body?.From as string) || (req.query?.From as string))
-  const tollfree = process.env.TWILIO_TOLLFREE as string
-  const agent = process.env.VAPI_AGENT_NUMBER as string
-  const site = (process.env.BOROMA_SITE || 'https://boroma.site').replace(/^https?:\/\//, '')
-  if (!from || !agent || !tollfree) {
-    return res.status(200).send(twiml(`<Say>Sorry, we cannot take your call right now</Say>`))
-  }
-
-  // 1) Is caller a member?
-  const { data: member } = await supabaseAdmin
+  const supabase = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } })
+  // Active member check by phone; adjust column/table names if yours differ
+  const { data: member } = await supabase
     .from('members')
-    .select('id,user_id,phone')
-    .eq('phone', from)
+    .select('id,status')
+    .eq('phone', caller)
+    .eq('status', 'active')
     .maybeSingle()
 
-  // Non-member → short message then forward to FREE Vapi line (TEST: 20s)
   if (!member) {
-    const msg = `This toll free line is for paid members. To join, visit ${site}.`
-    const xml = `
-      <Say voice="alice">${msg}</Say>
-      <Dial callerId="${tollfree}" timeLimit="20">${agent}</Dial>
-    `
-    return res.status(200).send(twiml(xml))
+    const msg =
+      'Thanks for calling Boroma. To use this toll free number, please buy a plan at boroma dot site. ' +
+      'Your first call is free at three three nine two zero nine one zero six five.'
+    const reject = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say>${msg}</Say>
+</Response>`
+    return new Response(reject, { headers: { 'Content-Type': 'text/xml' } })
   }
 
-  // 2) Check subscription active
-  const { data: sub } = await supabaseAdmin
-    .from('subscriptions')
-    .select('status')
-    .eq('user_id', member.user_id)
-    .order('current_period_end', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const active = sub?.status === 'active' || sub?.status === 'trialing'
-  if (!active) {
-    const msg = `Your plan is inactive. Please visit ${site} to reactivate.`
-    return res.status(200).send(twiml(`<Say voice="alice">${msg}</Say>`))
-  }
+  // Paid member -> connect to Vapi, 35-minute hard cap (2100 seconds)
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial answerOnBridge="true" timeout="60" timeLimit="2100">
+    <Number>${VAPI_AGENT_NUMBER}</Number>
+  </Dial>
+</Response>`
+  return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } })
+}
 
-  // 3) Enforce 10 calls per month (same as before)
-  const { data: usedRows } = await supabaseAdmin
-    .from('calls')
-    .select('id')
-    .eq('user_id', member.user_id)
-    .eq('is_member_call', true)
-    .eq('source', 'tollfree')
-    .gte('created_at', monthStartISO())
-  const used = usedRows?.length || 0
-  if (used >= 10) {
-    const msg = `You have used your ten calls for this month, the counter resets next month.`
-    return res.status(200).send(twiml(`<Say voice="alice">${msg}</Say>`))
-  }
-
-  // 4) TEST LIMITS: 30s leg, spoken reminder, then 20s leg
-  const cbBase = `/api/voice/status?user=${member.user_id}&member=${member.id}&source=tollfree&memberCall=1`
-  const xml = `
-    <Say voice="alice">Connecting you to Boroma, this call may be recorded for quality and safety.</Say>
-
-    <!-- First short leg: 30 seconds -->
-    <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="30" method="POST"
-          statusCallback="${cbBase}&leg=1"
-          statusCallbackEvent="initiated ringing answered completed">
-      ${agent}
-    </Dial>
-
-    <!-- Soft reminder -->
-    <Say voice="alice">You have ten minutes remaining on this call.</Say>
-
-    <!-- Final short leg: 20 seconds -->
-    <Dial callerId="${tollfree}" answerOnBridge="true" timeLimit="20" method="POST"
-          statusCallback="${cbBase}&leg=2"
-          statusCallbackEvent="initiated ringing answered completed">
-      ${agent}
-    </Dial>
-  `
-  return res.status(200).send(twiml(xml))
+export function GET() {
+  return new Response('POST required', { status: 405, headers: { Allow: 'POST' } })
 }
