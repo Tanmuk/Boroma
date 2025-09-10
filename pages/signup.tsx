@@ -1,100 +1,204 @@
-import { useMemo, useState } from 'react'
-import { useRouter } from 'next/router'
+// pages/signup.tsx
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { z } from 'zod'
+import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 
-const schema = z.object({
-  fullName: z.string().min(2, 'Name looks too short'),
-  phone: z.string()
-    .transform(v => v.replace(/[^\d+]/g, ''))
-    .refine(v => /^\+?\d{10,15}$/.test(v), 'Enter a valid phone number'),
-  email: z.string().email('Enter a valid email'),
-  password: z.string()
-    .min(8, 'Use at least 8 characters')
-    .refine(v => /[A-Za-z]/.test(v) && /\d/.test(v), 'Use letters and numbers for a stronger password'),
-})
+type Plan = 'monthly' | 'annual'
 
-export default function Signup(){
+function normalizeUSPhone(input: string) {
+  // keep digits only
+  const d = (input || '').replace(/\D/g, '')
+  // 10 digits -> +1XXXXXXXXXX
+  if (d.length === 10) return { e164: `+1${d}`, digits: d }
+  // 11 digits starting with 1 -> +1XXXXXXXXXX
+  if (d.length === 11 && d.startsWith('1')) return { e164: `+${d}`, digits: d.slice(1) }
+  // already looks like +E164 US?
+  if (input.startsWith('+1') && d.length === 11) return { e164: input, digits: d.slice(1) }
+  return { e164: '', digits: '' }
+}
+
+export default function Signup() {
   const router = useRouter()
-  const plan = useMemo(() => (router.query.plan === 'annual' ? 'annual' : 'monthly'), [router.query.plan])
+  const plan = useMemo<Plan>(() => {
+    const p = (router.query.plan as string) || 'monthly'
+    return p === 'annual' ? 'annual' : 'monthly'
+  }, [router.query.plan])
 
-  const [values, setValues] = useState({ fullName:'', phone:'', email:'', password:'' })
-  const [errors, setErrors] = useState<Record<string,string>>({})
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPwd, setShowPwd] = useState(false)
   const [loading, setLoading] = useState(false)
-  function set<K extends keyof typeof values>(k: K, v: string){ setValues(s => ({ ...s, [k]: v })) }
+  const [error, setError] = useState<string | null>(null)
 
-  async function onSubmit(e:any){
-    e.preventDefault()
-    setErrors({})
-    const parsed = schema.safeParse(values)
-    if (!parsed.success){
-      const errs: Record<string,string> = {}
-      for (const issue of parsed.error.issues) errs[(issue.path[0] as string)||'form'] = issue.message
-      setErrors(errs); return
-    }
-    const { fullName, phone, email, password } = parsed.data
+  // tiny password strength check – you asked to avoid “repeat password” field
+  const pwWeak =
+    password.length < 8 ||
+    !/[A-Z]/.test(password) ||
+    !/[a-z]/.test(password) ||
+    !/[0-9]/.test(password)
 
-    setLoading(true)
-    // Create the user account
-    const { data, error } = await supabase.auth.signUp({
-      email, password, options: { data: { full_name: fullName, phone } }
+  useEffect(() => {
+    // if already signed in, just go pay
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) startCheckout().catch(() => {})
     })
-    if (error){
-      setLoading(false)
-      setErrors({ form: error.message })
-      return
-    }
-    const userId = data.user?.id
-    if (!userId){ setLoading(false); setErrors({ form: 'Could not create account' }); return }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-    // Start Stripe Checkout
-    const r = await fetch('/api/checkout/start', {
+  async function startCheckout() {
+    // called only after a session exists
+    const res = await fetch(`/api/checkout/start?plan=${plan}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, email, userId })
+      credentials: 'include',
+      body: JSON.stringify({ name, phone })
     })
-    const j = await r.json()
-    setLoading(false)
+    if (!res.ok) {
+      const txt = await res.text()
+      throw new Error(txt || 'Failed to create checkout session')
+    }
+    const { url } = await res.json()
+    window.location.href = url
+  }
 
-    if (!j.url){ setErrors({ form: j.error || 'Could not start checkout' }); return }
-    window.location.href = j.url
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+
+    // basic client validation
+    if (!name.trim()) return setError('Please enter your full name')
+    const normalized = normalizeUSPhone(phone)
+    if (!normalized.e164) return setError('Enter a valid US phone number (e.g., +1 555 555 0100)')
+    if (pwWeak) return setError('Password must be 8+ chars and include upper, lower and a number')
+
+    try {
+      setLoading(true)
+
+      // 1) create account (if already exists Supabase returns error)
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email,
+        password
+      })
+      if (signUpErr && !/already registered/i.test(signUpErr.message)) {
+        throw signUpErr
+      }
+
+      // 2) if the email was already registered, sign in; else sign in the new user
+      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInErr) throw signInErr
+
+      // 3) save the user profile (allowed by your RLS as the user themselves)
+      const { data: userRes } = await supabase.auth.getUser()
+      const userId = userRes.user?.id
+      if (userId) {
+        await supabase.from('profiles').upsert({
+          id: userId,
+          full_name: name.trim(),
+          phone: normalized.e164,
+          phone_digits: normalized.digits
+        })
+      }
+
+      // 4) go to Stripe Checkout
+      await startCheckout()
+    } catch (err: any) {
+      setLoading(false)
+      setError(err?.message || 'Something went wrong, please try again')
+      return
+    }
   }
 
   return (
     <main className="container py-16">
-      <div className="max-w-md mx-auto card p-6">
-        <h1>Create your account</h1>
-        <p className="text-slate-600 mt-1">Enter your own information so that you can manage your plan and add members later</p>
+      <div className="max-w-xl mx-auto card p-6">
+        <h1 className="mb-1">Create your account</h1>
+        <p className="text-slate-600">
+          Enter your own information so you can manage your plan and add members later
+        </p>
 
-        {errors.form && <div className="mt-3 text-sm text-red-600">{errors.form}</div>}
+        {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
 
-        <form onSubmit={onSubmit} className="mt-4">
-          <label className="block text-sm font-medium">Full name</label>
-          <input className="w-full border rounded-xl p-3 mt-1 mb-2" value={values.fullName} onChange={e=>set('fullName', e.target.value)} placeholder="Jane Doe"/>
-          {errors.fullName && <p className="text-red-600 text-xs mb-2">{errors.fullName}</p>}
+        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium">Full name</label>
+            <input
+              className="w-full border rounded-xl p-3 mt-1"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Jane Doe"
+              required
+            />
+          </div>
 
-          <label className="block text-sm font-medium">Phone</label>
-          <input className="w-full border rounded-xl p-3 mt-1 mb-2" value={values.phone} onChange={e=>set('phone', e.target.value)} placeholder="+1 555 0100"/>
-          {errors.phone && <p className="text-red-600 text-xs mb-2">{errors.phone}</p>}
+          <div>
+            <label className="block text-sm font-medium">Phone (US)</label>
+            <input
+              className="w-full border rounded-xl p-3 mt-1"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 555 555 0100"
+              inputMode="tel"
+              required
+            />
+          </div>
 
-          <label className="block text-sm font-medium">Email address</label>
-          <input className="w-full border rounded-xl p-3 mt-1 mb-2" type="email" value={values.email} onChange={e=>set('email', e.target.value)} placeholder="you@example.com"/>
-          {errors.email && <p className="text-red-600 text-xs mb-2">{errors.email}</p>}
+          <div>
+            <label className="block text-sm font-medium">Email address</label>
+            <input
+              className="w-full border rounded-xl p-3 mt-1"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              required
+            />
+          </div>
 
-          <label className="block text-sm font-medium">Password</label>
-          <input className="w-full border rounded-xl p-3 mt-1 mb-1" type="password" value={values.password} onChange={e=>set('password', e.target.value)} placeholder="At least 8 chars with letters and numbers"/>
-          {errors.password && <p className="text-red-600 text-xs mb-2">{errors.password}</p>}
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium">Password</label>
+              <button
+                type="button"
+                className="btn-link text-sm"
+                onClick={() => setShowPwd((s) => !s)}
+              >
+                {showPwd ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <input
+              className="w-full border rounded-xl p-3 mt-1"
+              type={showPwd ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="At least 8 chars, with A-Z, a-z and 0-9"
+              required
+            />
+            <p className={`text-xs mt-1 ${pwWeak ? 'text-amber-600' : 'text-green-700'}`}>
+              {pwWeak ? 'Weak password' : 'Looks good'}
+            </p>
+          </div>
 
-          <button className="btn btn-primary w-full mt-2" disabled={loading}>
-            {loading ? 'Please wait' : 'Continue to payment'}
+          <button className="btn btn-primary w-full" disabled={loading}>
+            {loading ? 'Please wait…' : 'Continue to payment'}
           </button>
 
-          <p className="text-xs text-slate-500 mt-3">
-            By continuing you agree to our <Link className="btn-link" href="/legal/terms">Terms</Link> and <Link className="btn-link" href="/legal/privacy">Privacy</Link>
+          <p className="text-xs text-slate-600">
+            Plan: <strong>{plan === 'annual' ? 'Annual' : 'Monthly'}</strong>. By continuing you
+            agree to our{' '}
+            <Link className="btn-link" href="/terms">
+              Terms
+            </Link>{' '}
+            and{' '}
+            <Link className="btn-link" href="/privacy">
+              Privacy
+            </Link>
+            .
           </p>
 
-          <p className="text-sm mt-4">
+          <p className="text-sm">
             Already have an account? <Link className="btn-link" href="/login">Sign in</Link>
           </p>
         </form>
