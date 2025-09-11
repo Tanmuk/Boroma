@@ -1,5 +1,5 @@
 // pages/signup.tsx
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
 import { useSupabaseClient } from '@supabase/auth-helpers-react'
@@ -16,7 +16,7 @@ function toE164US(raw: string) {
 export default function SignUp() {
   const router = useRouter()
   const supabase = useSupabaseClient()
-  const plan = (router.query.plan as Plan) || 'monthly'
+  const plan: Plan = (router.query.plan as Plan) || 'monthly'
 
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
@@ -34,6 +34,26 @@ export default function SignUp() {
     password.length >= 8 &&
     toE164US(phone).length >= 11
 
+  async function continueToCheckout(currentPlan: Plan) {
+    // Always send the bearer token – no dependence on cookies
+    const { data: sess } = await supabase.auth.getSession()
+    const token = sess.session?.access_token
+    if (!token) throw new Error('Not signed in (no access token)')
+
+    const res = await fetch(`/api/checkout/start?plan=${currentPlan}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!res.ok) {
+      const t = await res.text()
+      throw new Error(`Checkout failed (${res.status}) ${t}`)
+    }
+    const { url } = await res.json()
+    window.location.href = url
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!canSubmit || submitting) return
@@ -42,7 +62,7 @@ export default function SignUp() {
     setNotice(null)
 
     try {
-      // 1) sign up (if “Confirm email” is ON, no session will be returned here)
+      // 1) Sign up (if email confirmation is ON, no session is returned here)
       const { data, error: signErr } = await supabase.auth.signUp({
         email,
         password,
@@ -53,10 +73,10 @@ export default function SignUp() {
       })
       if (signErr) throw signErr
 
+      // 2) If there’s a session, we’re signed in right away; if not, tell user to confirm email
       if (!data.session) {
-        // email confirmation required
         setNotice(
-          'We sent a confirmation email. Open it to finish sign-in, then come back here and click the orange button again to continue to payment.'
+          'We sent a confirmation email. Open it and finish sign-in, then return to this page and click the orange button again to continue to payment.'
         )
         return
       }
@@ -64,13 +84,22 @@ export default function SignUp() {
       const userId = data.user?.id
       if (!userId) throw new Error('Missing user id')
 
-      // 2) profile
-      const { error: profErr } = await supabase
-        .from('profiles')
-        .upsert({ id: userId, full_name: fullName, email, phone: toE164US(phone) }, { onConflict: 'id' })
-      if (profErr) throw profErr
+   // 3) Create/Update profile (now includes email)
+const { error: profErr } = await supabase
+  .from('profiles')
+  .upsert(
+    {
+      id: userId,
+      full_name: fullName,
+      phone: toE164US(phone),
+      email,                    // <— add this line
+    },
+    { onConflict: 'id' }        // still keying on the auth user id
+  )
+if (profErr) throw profErr
 
-      // 3) first member (primary)
+
+      // 4) Create the initial member as primary (ignore conflict if it already exists)
       const { error: memErr } = await supabase.from('members').insert({
         user_id: userId,
         name: fullName,
@@ -79,14 +108,8 @@ export default function SignUp() {
       })
       if (memErr && !/duplicate|unique/i.test(memErr.message)) throw memErr
 
-      // 4) Stripe checkout – requires the auth cookie that the provider sets
-      const res = await fetch(`/api/checkout/start?plan=${plan}`, { method: 'POST' })
-      if (!res.ok) {
-        const t = await res.text()
-        throw new Error(`Checkout failed (${res.status}) ${t}`)
-      }
-      const { url } = await res.json()
-      window.location.href = url
+      // 5) Go to Stripe Checkout
+      await continueToCheckout(plan)
     } catch (err: any) {
       setError(err?.message || 'Something went wrong')
     } finally {
@@ -114,7 +137,12 @@ export default function SignUp() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-sm mb-1">Full name</label>
-              <input className="w-full rounded-md border px-3 py-2" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+              <input
+                className="w-full rounded-md border px-3 py-2"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+              />
             </div>
 
             <div>
