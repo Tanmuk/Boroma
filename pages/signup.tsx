@@ -1,114 +1,153 @@
-// pages/signup.tsx
-import { useState } from 'react';
-import Head from 'next/head';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useState, useMemo } from 'react'
+import Head from 'next/head'
+import { useRouter } from 'next/router'
+import { supabase } from '@/lib/supabaseClient'
 
-export default function Signup() {
-  const supabase = createClientComponentClient();
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function SignupPage() {
+  const router = useRouter()
+  const planFromUrl = useMemo<'monthly'|'annual'>(() =>
+    (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plan') === 'annual')
+      ? 'annual'
+      : 'monthly'
+  , [router.asPath])
+
+  const [fullName, setFullName]   = useState('')
+  const [phone, setPhone]         = useState('')
+  const [email, setEmail]         = useState('')
+  const [password, setPassword]   = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState<string | null>(null)
 
   async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setBusy(true);
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
 
+    // 1) Create the auth user
+    const { data: sign, error: signErr } = await supabase.auth.signUp({ email, password })
+    if (signErr) {
+      setLoading(false)
+      setError(signErr.message)
+      return
+    }
+
+    const session = sign.session
+    if (!session) {
+      // If you ever enable email confirmations in Supabase, this will be null.
+      setLoading(false)
+      setError('Check your email to confirm your account, then sign in to continue.')
+      return
+    }
+
+    // 2) Store profile info (includes email so you can see it in the dashboard)
+    await supabase.from('profiles').upsert({
+      id: sign.user!.id,
+      full_name: fullName,
+      phone,
+      email,
+    })
+
+    // 3) Start Stripe checkout (POST with Bearer token)
     try {
-      // 1) Sign up (no email confirmation — Supabase Auth > “Confirm email” OFF)
-      const { data: sign, error: signErr } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName } },
-      });
-      if (signErr) throw signErr;
-
-      // Ensure we have a session (if confirm-email were ON, this would be null)
-      const { data: sess } = await supabase.auth.getSession();
-      if (!sess.session) {
-        throw new Error('No active session after signup. Please try again.');
-      }
-
-      const user = sign.user ?? sess.session.user;
-
-      // 2) Create/update profile
-      const { error: pErr } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, full_name: fullName, phone }, { onConflict: 'id' });
-      if (pErr) throw pErr;
-
-      // 3) DO NOT add a member here. The user will add members later on Dashboard.
-
-      // 4) Go to Stripe checkout (monthly default; change query if you have a toggle)
-      const plan = 'monthly';
-      const res = await fetch(`/api/checkout/start?plan=${plan}`, { method: 'POST' });
-      if (!res.ok) {
-        const t = await res.json().catch(() => ({}));
-        throw new Error(t.error || `Checkout failed (${res.status})`);
-      }
-      const { url } = await res.json();
-      window.location.href = url;
+      const r = await fetch('/api/checkout/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ plan: planFromUrl }),
+      })
+      const json = await r.json()
+      if (!r.ok) throw new Error(json?.error || 'Could not start checkout')
+      window.location.href = json.url as string
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
-    } finally {
-      setBusy(false);
+      setError(err.message || 'Checkout failed')
+      setLoading(false)
     }
   }
 
   return (
     <>
-      <Head><title>Create your account • Boroma</title></Head>
+      <Head>
+        <title>Create your account • Boroma</title>
+      </Head>
 
-      <main className="mx-auto max-w-xl px-4 pb-16">
-        <h1 className="mt-10 text-4xl font-extrabold">Create your account</h1>
-        <p className="mt-3 text-gray-600">
-          <strong>Enter your own information</strong> so you can manage your plan.
-          You’ll add members for Boroma support later on your dashboard.
-        </p>
-
-        {error && (
-          <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
-            {error}
+      <div className="min-h-screen bg-orange-50">
+        <div className="max-w-3xl mx-auto px-4 py-10">
+          <h1 className="text-4xl font-extrabold text-orange-900">Create your account</h1>
+          <p className="mt-2 text-slate-700">
+            Enter <b>your own</b> details to manage billing and add members later from your dashboard.
           </p>
-        )}
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium">Full name</label>
-            <input className="mt-1 w-full rounded border p-2"
-              value={fullName} onChange={(e) => setFullName(e.target.value)} required />
-          </div>
+          {error && (
+            <div className="mt-5 rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3">
+              {error}
+            </div>
+          )}
 
-          <div>
-            <label className="block text-sm font-medium">Phone (US)</label>
-            <input className="mt-1 w-full rounded border p-2"
-              value={phone} onChange={(e) => setPhone(e.target.value)} />
-          </div>
+          <form onSubmit={onSubmit} className="mt-6 space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Full name</label>
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium">Email address</label>
-            <input type="email" className="mt-1 w-full rounded border p-2"
-              value={email} onChange={(e) => setEmail(e.target.value)} required />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Phone (US)</label>
+              <input
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1XXXXXXXXXX"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                This is for your account; members for Boroma service are added later.
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium">Password</label>
-            <input type="password" minLength={8} className="mt-1 w-full rounded border p-2"
-              value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Email address</label>
+              <input
+                type="email"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="mt-4 w-full rounded bg-orange-500 px-4 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
-          >
-            {busy ? 'Working…' : 'Continue to payment'}
-          </button>
-        </form>
-      </main>
+            <div>
+              <label className="block text-sm font-medium text-slate-700">Password</label>
+              <input
+                type="password"
+                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+              />
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-xl bg-gradient-to-b from-orange-500 to-orange-600 text-white font-semibold py-3 shadow hover:from-orange-600 hover:to-orange-700 disabled:opacity-60"
+              >
+                {loading ? 'Starting checkout…' : 'Continue to payment'}
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500">
+              Plan: <b>{planFromUrl === 'annual' ? 'Annual' : 'Monthly'}</b>. You can add members after checkout.
+            </p>
+          </form>
+        </div>
+      </div>
     </>
-  );
+  )
 }
