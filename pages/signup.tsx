@@ -1,218 +1,114 @@
 // pages/signup.tsx
-import { useState } from 'react'
-import Head from 'next/head'
-import { useRouter } from 'next/router'
-import { useSupabaseClient } from '@supabase/auth-helpers-react'
+import { useState } from 'react';
+import Head from 'next/head';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-type Plan = 'monthly' | 'annual'
+export default function Signup() {
+  const supabase = createClientComponentClient();
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-function toE164US(raw: string) {
-  const d = (raw || '').replace(/\D/g, '')
-  if (!d) return ''
-  const core = d.length === 11 && d.startsWith('1') ? d.slice(1) : d
-  return core.length === 10 ? `+1${core}` : `+${d}`
-}
-
-export default function SignUp() {
-  const router = useRouter()
-  const supabase = useSupabaseClient()
-  const plan: Plan = (router.query.plan as Plan) || 'monthly'
-
-  const [fullName, setFullName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPw, setShowPw] = useState(false)
-
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-
-  const canSubmit =
-    fullName.trim().length > 1 &&
-    /\S+@\S+\.\S+/.test(email) &&
-    password.length >= 8 &&
-    toE164US(phone).length >= 11
-
-  async function continueToCheckout(currentPlan: Plan) {
-    // Always send the bearer token – no dependence on cookies
-    const { data: sess } = await supabase.auth.getSession()
-    const token = sess.session?.access_token
-    if (!token) throw new Error('Not signed in (no access token)')
-
-    const res = await fetch(`/api/checkout/start?plan=${currentPlan}`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-    if (!res.ok) {
-      const t = await res.text()
-      throw new Error(`Checkout failed (${res.status}) ${t}`)
-    }
-    const { url } = await res.json()
-    window.location.href = url
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!canSubmit || submitting) return
-    setSubmitting(true)
-    setError(null)
-    setNotice(null)
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
 
     try {
-      // 1) Sign up (if email confirmation is ON, no session is returned here)
-      const { data, error: signErr } = await supabase.auth.signUp({
+      // 1) Sign up (no email confirmation — Supabase Auth > “Confirm email” OFF)
+      const { data: sign, error: signErr } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { full_name: fullName, phone: toE164US(phone) },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-      if (signErr) throw signErr
+        options: { data: { full_name: fullName } },
+      });
+      if (signErr) throw signErr;
 
-      // 2) If there’s a session, we’re signed in right away; if not, tell user to confirm email
-      if (!data.session) {
-        setNotice(
-          'We sent a confirmation email. Open it and finish sign-in, then return to this page and click the orange button again to continue to payment.'
-        )
-        return
+      // Ensure we have a session (if confirm-email were ON, this would be null)
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess.session) {
+        throw new Error('No active session after signup. Please try again.');
       }
 
-      const userId = data.user?.id
-      if (!userId) throw new Error('Missing user id')
+      const user = sign.user ?? sess.session.user;
 
-   // 3) Create/Update profile (now includes email)
-const { error: profErr } = await supabase
-  .from('profiles')
-  .upsert(
-    {
-      id: userId,
-      full_name: fullName,
-      phone: toE164US(phone),
-      email,                    // <— add this line
-    },
-    { onConflict: 'id' }        // still keying on the auth user id
-  )
-if (profErr) throw profErr
+      // 2) Create/update profile
+      const { error: pErr } = await supabase
+        .from('profiles')
+        .upsert({ id: user.id, full_name: fullName, phone }, { onConflict: 'id' });
+      if (pErr) throw pErr;
 
+      // 3) DO NOT add a member here. The user will add members later on Dashboard.
 
-      // 4) Create the initial member as primary (ignore conflict if it already exists)
-      const { error: memErr } = await supabase.from('members').insert({
-        user_id: userId,
-        name: fullName,
-        phone: toE164US(phone),
-        is_primary: true,
-      })
-      if (memErr && !/duplicate|unique/i.test(memErr.message)) throw memErr
-
-      // 5) Go to Stripe Checkout
-      await continueToCheckout(plan)
+      // 4) Go to Stripe checkout (monthly default; change query if you have a toggle)
+      const plan = 'monthly';
+      const res = await fetch(`/api/checkout/start?plan=${plan}`, { method: 'POST' });
+      if (!res.ok) {
+        const t = await res.json().catch(() => ({}));
+        throw new Error(t.error || `Checkout failed (${res.status})`);
+      }
+      const { url } = await res.json();
+      window.location.href = url;
     } catch (err: any) {
-      setError(err?.message || 'Something went wrong')
+      setError(err.message || 'Something went wrong');
     } finally {
-      setSubmitting(false)
+      setBusy(false);
     }
   }
 
   return (
     <>
-      <Head>
-        <title>Create your account – Boroma</title>
-        <meta name="robots" content="noindex" />
-      </Head>
+      <Head><title>Create your account • Boroma</title></Head>
 
-      <main className="min-h-screen bg-gradient-to-b from-[#fde7c0] to-white">
-        <div className="max-w-xl mx-auto px-6 py-10">
-          <h1 className="text-4xl font-bold">Create your account</h1>
-          <p className="mt-2 text-slate-600">
-            Enter your own information so that you can manage your plan and add members later
+      <main className="mx-auto max-w-xl px-4 pb-16">
+        <h1 className="mt-10 text-4xl font-extrabold">Create your account</h1>
+        <p className="mt-3 text-gray-600">
+          <strong>Enter your own information</strong> so you can manage your plan.
+          You’ll add members for Boroma support later on your dashboard.
+        </p>
+
+        {error && (
+          <p className="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+            {error}
           </p>
+        )}
 
-          {error && <div className="mt-4 rounded-md bg-red-50 p-3 text-red-700 text-sm">{error}</div>}
-          {notice && <div className="mt-4 rounded-md bg-amber-50 p-3 text-amber-800 text-sm">{notice}</div>}
+        <form onSubmit={onSubmit} className="mt-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium">Full name</label>
+            <input className="mt-1 w-full rounded border p-2"
+              value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+          </div>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm mb-1">Full name</label>
-              <input
-                className="w-full rounded-md border px-3 py-2"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium">Phone (US)</label>
+            <input className="mt-1 w-full rounded border p-2"
+              value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
 
-            <div>
-              <label className="block text-sm mb-1">Phone (US)</label>
-              <input
-                className="w-full rounded-md border px-3 py-2"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1 555 010 0100"
-                inputMode="tel"
-                required
-              />
-              <p className="mt-1 text-xs text-slate-500">Stored as {toE164US(phone) || '—'}.</p>
-            </div>
+          <div>
+            <label className="block text-sm font-medium">Email address</label>
+            <input type="email" className="mt-1 w-full rounded border p-2"
+              value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
 
-            <div>
-              <label className="block text-sm mb-1">Email address</label>
-              <input
-                className="w-full rounded-md border px-3 py-2"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                autoComplete="email"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium">Password</label>
+            <input type="password" minLength={8} className="mt-1 w-full rounded border p-2"
+              value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
 
-            <div>
-              <label className="block text-sm mb-1">Password</label>
-              <div className="relative">
-                <input
-                  className="w-full rounded-md border px-3 py-2 pr-20"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  type={showPw ? 'text' : 'password'}
-                  minLength={8}
-                  autoComplete="new-password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPw((s) => !s)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-slate-600"
-                >
-                  {showPw ? 'Hide' : 'Show'}
-                </button>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">At least 8 characters.</p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={!canSubmit || submitting}
-              className="w-full rounded-md bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 font-medium shadow-md hover:shadow-lg disabled:opacity-60"
-            >
-              {submitting ? 'Working…' : 'Continue to payment'}
-            </button>
-
-            <p className="text-xs text-slate-500">
-              Plan: {plan === 'annual' ? 'Annual' : 'Monthly'}. By continuing you agree to our{' '}
-              <a className="underline" href="/terms" target="_blank">Terms</a> and{' '}
-              <a className="underline" href="/privacy" target="_blank">Privacy</a>.
-            </p>
-
-            <p className="text-sm">
-              Already have an account? <a className="text-orange-600 underline" href="/login">Sign in</a>
-            </p>
-          </form>
-        </div>
+          <button
+            type="submit"
+            disabled={busy}
+            className="mt-4 w-full rounded bg-orange-500 px-4 py-3 font-semibold text-white hover:bg-orange-600 disabled:opacity-60"
+          >
+            {busy ? 'Working…' : 'Continue to payment'}
+          </button>
+        </form>
       </main>
     </>
-  )
+  );
 }
