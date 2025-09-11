@@ -1,56 +1,69 @@
 // pages/api/checkout/start.ts
-import type { NextApiRequest, NextApiResponse } from 'next'
-import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-06-20',
-})
-
-type Plan = 'monthly' | 'annual'
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-    const plan = ((req.query.plan as string) || 'monthly') as Plan
-    const priceId =
-      plan === 'annual' ? process.env.STRIPE_PRICE_ANNUAL : process.env.STRIPE_PRICE_MONTHLY
-    if (!priceId) return res.status(500).json({ error: 'Missing Stripe price id' })
+  const supabase = createPagesServerClient({ req, res });
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) return res.status(401).json({ error: 'Not signed in' });
 
-    // Verify Supabase user via bearer token (no cookie dependency)
-    const auth = req.headers.authorization || ''
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : ''
-    if (!token) return res.status(401).json({ error: 'Not signed in' })
+  const user = session.user;
+  const plan = (req.query.plan as string) || 'monthly';
 
-    const admin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-    const { data: userRes, error: userErr } = await admin.auth.getUser(token)
-    if (userErr || !userRes?.user) return res.status(401).json({ error: 'Invalid token' })
-    const user = userRes.user
+  // Map your Stripe price IDs
+  const priceId =
+    plan === 'monthly'
+      ? process.env.STRIPE_PRICE_MONTHLY_ID!
+      : process.env.STRIPE_PRICE_ANNUAL_ID!;
 
-    const origin =
-      (req.headers.origin as string) ||
-      (req.headers['x-forwarded-proto'] && req.headers.host
-        ? `${req.headers['x-forwarded-proto']}://${req.headers.host}`
-        : `https://${req.headers.host}`)
+  // Ensure there is a Stripe customer for this user (by email)
+  let customerId: string | undefined;
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      allow_promotion_codes: true,
-      customer_email: user.email ?? undefined,
-      success_url: `${origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/signup?plan=${plan}&checkout=cancel`,
+  // Look up existing subscription row to reuse customer id if present
+  const { data: subRow } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (subRow?.stripe_customer_id) {
+    customerId = subRow.stripe_customer_id;
+  } else {
+    const customer = await stripe.customers.create({
+      email: user.email ?? undefined,
       metadata: { user_id: user.id },
-      automatic_tax: { enabled: true },
-    })
-
-    return res.status(200).json({ url: session.url })
-  } catch (err: any) {
-    console.error('checkout/start error', err)
-    return res.status(500).json({ error: err?.message || 'Server error' })
+    });
+    customerId = customer.id;
   }
+
+  // Create Checkout
+  const sessionStripe = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    customer: customerId,
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard?joined=1`,
+    cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/signup?canceled=1`,
+    metadata: {
+      user_id: user.id,
+      plan,
+    },
+  });
+
+  // Pre-create / upsert a row so the dashboard can show “trialing” quickly (optional)
+  await supabase.from('subscriptions').upsert(
+    {
+      user_id: user.id,
+      plan: priceId,
+      status: 'trialing', // will be corrected by webhook
+      stripe_customer_id: customerId!,
+    },
+    { onConflict: 'user_id' },
+  );
+
+  return res.status(200).json({ url: sessionStripe.url });
 }
