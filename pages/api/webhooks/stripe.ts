@@ -1,4 +1,3 @@
-// pages/api/webhooks/stripe.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import Stripe from 'stripe'
 import { Resend } from 'resend'
@@ -6,19 +5,19 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export const config = { api: { bodyParser: false } }
 
-// ========= ENV (must be set in Vercel) =========
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY as string
+// ====== ENV ======
+const STRIPE_SECRET_KEY     = process.env.STRIPE_SECRET_KEY as string
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET as string
-const RESEND_API_KEY = process.env.RESEND_API_KEY as string
-const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://boroma.site'
-const PORTAL = process.env.NEXT_PUBLIC_STRIPE_CUSTOMER_PORTAL_URL || 'https://billing.stripe.com/p/login/5kA7tX49H7PNbAs288'
-const FROM = 'Boroma <hello@boroma.site>'
+const RESEND_API_KEY        = process.env.RESEND_API_KEY as string
+const SITE                  = process.env.NEXT_PUBLIC_SITE_URL || 'https://boroma.site'
+const PORTAL                = process.env.NEXT_PUBLIC_STRIPE_CUSTOMER_PORTAL_URL || 'https://billing.stripe.com/p/login/5kA7tX49H7PNbAs288'
+const FROM                  = 'Boroma <hello@boroma.site>'
 
-// ========= CLIENTS =========
-const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
+// ====== CLIENTS ======
+const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
 const resend = new Resend(RESEND_API_KEY)
 
-// ========= UTILS =========
+// ====== UTILS ======
 async function readRawBody(req: NextApiRequest): Promise<Buffer> {
   const chunks: Uint8Array[] = []
   for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
@@ -73,14 +72,21 @@ function emailShell(opts: {
 async function sendEmail(to: string, subject: string, html: string, idempotencyKey: string) {
   if (!RESEND_API_KEY) return
   try {
-    await resend.emails.send({ from: FROM, to, subject, html, headers: { 'Idempotency-Key': idempotencyKey } })
+    await resend.emails.send({
+      from: FROM,
+      to,
+      subject,
+      html,
+      headers: { 'Idempotency-Key': idempotencyKey },
+    })
   } catch {
-    // never crash the webhook on email errors
+    // Never crash the webhook on email errors
   }
 }
+
 const idemKey = (eventId: string, tag: string) => `${eventId}:${tag}`
 
-// ========= TEMPLATED EMAIL SENDERS =========
+// ====== EMAILS ======
 async function sendPlanActivatedEmail(to: string, idKey: string) {
   const html = emailShell({
     title: 'Your Boroma plan is active',
@@ -88,11 +94,11 @@ async function sendPlanActivatedEmail(to: string, idKey: string) {
     bullets: [
       'Toll-free support number: 877-766-6307 (share only with approved members)',
       'Add or remove members any time from your dashboard',
-      'You will receive a call summary after each support call'
+      'You will receive a call summary after each support call',
     ],
     ctaText: 'Manage billing & members',
     ctaHref: PORTAL,
-    footnote: `Dashboard: ${SITE}/dashboard`
+    footnote: `Dashboard: ${SITE}/dashboard`,
   })
   await sendEmail(to, 'Your Boroma plan is active', html, idKey)
 }
@@ -104,10 +110,10 @@ async function sendCancelAtPeriodEndEmail(to: string, periodEndUnix: number | nu
     intro: `We’ve received your cancellation. Your access will continue until ${when}.`,
     bullets: [
       'Members will keep access until the end date',
-      'You can reactivate any time before the period ends'
+      'You can reactivate any time before the period ends',
     ],
     ctaText: 'Manage billing',
-    ctaHref: PORTAL
+    ctaHref: PORTAL,
   })
   await sendEmail(to, 'Your Boroma plan will end soon', html, idKey)
 }
@@ -118,10 +124,10 @@ async function sendPlanCanceledEmail(to: string, idKey: string) {
     intro: 'We’re sorry to see you go. Your toll-free access has been turned off.',
     bullets: [
       'You can still use the one-time free trial line if you haven’t already',
-      'Come back any time—your settings will be waiting'
+      'Come back any time—your settings will be waiting',
     ],
     ctaText: 'Restart plan',
-    ctaHref: `${SITE}#pricing`
+    ctaHref: `${SITE}#pricing`,
   })
   await sendEmail(to, 'Your Boroma plan is cancelled', html, idKey)
 }
@@ -132,14 +138,13 @@ async function sendPaymentFailedEmail(to: string, invoiceUrl: string | null, idK
     intro: 'We could not process your latest payment. Update your card to keep toll-free access active.',
     bullets: ['We’ll retry automatically over the next few days'],
     ctaText: 'Update payment method',
-    ctaHref: invoiceUrl || PORTAL
+    ctaHref: invoiceUrl || PORTAL,
   })
   await sendEmail(to, 'Payment failed — action needed', html, idKey)
 }
 
-// ========= EMAIL ROUTER FOR STRIPE EVENTS =========
+// ====== EMAIL ROUTER ======
 async function handleStripeEmails(event: Stripe.Event) {
-  // Find a usable customer email across different event types
   async function getEmail(): Promise<string | null> {
     const obj: any = (event as any).data?.object
     if (!obj) return null
@@ -156,7 +161,6 @@ async function handleStripeEmails(event: Stripe.Event) {
   }
 
   switch (event.type) {
-    // Send “active” ONLY when the first subscription invoice is paid
     case 'invoice.payment_succeeded': {
       const invoice = event.data.object as Stripe.Invoice
       if (invoice.billing_reason === 'subscription_create') {
@@ -165,8 +169,6 @@ async function handleStripeEmails(event: Stripe.Event) {
       }
       break
     }
-
-    // Scheduled cancel (flag toggled false -> true)
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription
       const prev = (event as any).data?.previous_attributes
@@ -177,15 +179,11 @@ async function handleStripeEmails(event: Stripe.Event) {
       }
       break
     }
-
-    // Immediate cancel
     case 'customer.subscription.deleted': {
       const to = await getEmail()
       if (to) await sendPlanCanceledEmail(to, idemKey(event.id, 'cancelled'))
       break
     }
-
-    // Payment failed
     case 'invoice.payment_failed': {
       const invoice = event.data.object as Stripe.Invoice
       const to = await getEmail()
@@ -193,118 +191,64 @@ async function handleStripeEmails(event: Stripe.Event) {
       if (to) await sendPaymentFailedEmail(to, url, idemKey(event.id, 'pay_failed'))
       break
     }
-
     default:
-      // no email for other events
       break
   }
 }
 
-// ========= HELPERS: USER & UPSERT =========
-async function resolveUserId(opts: {
-  session?: Stripe.Checkout.Session | null
-  subscription?: Stripe.Subscription | null
-}): Promise<string | null> {
-  const { session, subscription } = opts
-
-  // 1) From Checkout session (metadata.user_id OR client_reference_id)
-  const fromSession =
-    (session?.metadata && (session.metadata as any).user_id) ||
-    (session?.client_reference_id as string | undefined)
-  if (fromSession) return fromSession
-
-  // 2) From Stripe Customer metadata.user_id
-  const customerId =
-    (session?.customer as string | undefined) ||
-    (subscription?.customer as string | undefined)
-  if (customerId) {
-    const cust = await stripe.customers.retrieve(customerId)
-    if (!('deleted' in cust)) {
-      const uid = (cust.metadata && (cust.metadata as any).user_id) || null
-      if (uid) return uid
-    }
-    // 3) Fallback: our own subscriptions table by stripe_customer_id
-    const { data: row } = await supabaseAdmin
-      .from('subscriptions')
-      .select('user_id')
-      .eq('stripe_customer_id', customerId)
-      .maybeSingle()
-    if (row?.user_id) return row.user_id
-  }
-  return null
-}
-
-async function upsertSubscriptionRow(sub: Stripe.Subscription, userId?: string | null) {
-  const payload = {
+// ====== DB UPSERT ======
+async function upsertSubscription(sub: Stripe.Subscription, userId?: string | null) {
+  await supabaseAdmin.from('subscriptions').upsert({
     stripe_subscription_id: sub.id,
     stripe_customer_id: sub.customer as string,
-    user_id: userId ?? undefined, // only set if we have it
+    user_id: userId ?? undefined,
     plan: sub.items.data[0]?.price?.id || null,
     status: sub.status,
     current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-    current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-    cancel_at_period_end: sub.cancel_at_period_end ?? false
-  }
-  await supabaseAdmin.from('subscriptions').upsert(payload, { onConflict: 'stripe_subscription_id' })
+    current_period_end:   new Date(sub.current_period_end   * 1000).toISOString(),
+    cancel_at_period_end: sub.cancel_at_period_end ?? false,
+  }, { onConflict: 'stripe_subscription_id' })
 }
 
-// ========= MAIN HANDLER =========
+// ====== MAIN HANDLER ======
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const sig = req.headers['stripe-signature'] as string
     const buf = await readRawBody(req)
-    let event: Stripe.Event
 
+    let event: Stripe.Event
     try {
-      event = stripe.webhooks.constructEvent(buf, sig, STRIPE_WEBHOOK_SECRET!)
+      event = stripe.webhooks.constructEvent(buf, sig, STRIPE_WEBHOOK_SECRET)
     } catch (err: any) {
       return res.status(400).send(`Webhook Error: ${err.message}`)
     }
 
-    // Non-blocking event log (best-effort)
-    supabaseAdmin.from('webhook_event_logs')
-      .insert({ source: 'stripe', payload: event })
-      .catch(() => {})
-
-    // 1) Send the correct email for this event (idempotent)
+    // 1) emails (idempotent)
     await handleStripeEmails(event)
 
-    // 2) Keep DB in sync
+    // 2) sync DB
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        const user_id = await resolveUserId({ session })
         const subId = (session.subscription as string) || null
-        if (user_id && subId) {
+        if (subId) {
           const sub = await stripe.subscriptions.retrieve(subId)
-          await upsertSubscriptionRow(sub, user_id)
+          await upsertSubscription(sub, (session.client_reference_id as string) || null)
         }
         break
       }
-
-      case 'customer.subscription.created': {
-        const sub = event.data.object as Stripe.Subscription
-        const user_id = await resolveUserId({ subscription: sub })
-        await upsertSubscriptionRow(sub, user_id)
-        break
-      }
-
+      case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
-        // If we already have the row, upsert without changing user_id.
-        // If missing, try to resolve user and set it now.
-        const user_id = await resolveUserId({ subscription: sub })
-        await upsertSubscriptionRow(sub, user_id)
+        await upsertSubscription(sub)
         break
       }
-
       default:
-        // ignore others for DB
         break
     }
 
-    return res.json({ received: true })
+    return res.status(200).json({ received: true })
   } catch (e: any) {
     return res.status(500).send(`Webhook handler error: ${e.message}`)
   }
