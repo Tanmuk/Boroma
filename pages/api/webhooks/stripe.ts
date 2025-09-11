@@ -1,4 +1,4 @@
-// /pages/api/webhooks/stripe.ts
+// pages/api/webhooks/stripe.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import Stripe from 'stripe'
 import { Resend } from 'resend'
@@ -15,7 +15,7 @@ const PORTAL = process.env.NEXT_PUBLIC_STRIPE_CUSTOMER_PORTAL_URL || 'https://bi
 const FROM = 'Boroma <hello@boroma.site>'
 
 // ========= CLIENTS =========
-const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' })
+const stripe = new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
 const resend = new Resend(RESEND_API_KEY)
 
 // ========= UTILS =========
@@ -200,6 +200,54 @@ async function handleStripeEmails(event: Stripe.Event) {
   }
 }
 
+// ========= HELPERS: USER & UPSERT =========
+async function resolveUserId(opts: {
+  session?: Stripe.Checkout.Session | null
+  subscription?: Stripe.Subscription | null
+}): Promise<string | null> {
+  const { session, subscription } = opts
+
+  // 1) From Checkout session (metadata.user_id OR client_reference_id)
+  const fromSession =
+    (session?.metadata && (session.metadata as any).user_id) ||
+    (session?.client_reference_id as string | undefined)
+  if (fromSession) return fromSession
+
+  // 2) From Stripe Customer metadata.user_id
+  const customerId =
+    (session?.customer as string | undefined) ||
+    (subscription?.customer as string | undefined)
+  if (customerId) {
+    const cust = await stripe.customers.retrieve(customerId)
+    if (!('deleted' in cust)) {
+      const uid = (cust.metadata && (cust.metadata as any).user_id) || null
+      if (uid) return uid
+    }
+    // 3) Fallback: our own subscriptions table by stripe_customer_id
+    const { data: row } = await supabaseAdmin
+      .from('subscriptions')
+      .select('user_id')
+      .eq('stripe_customer_id', customerId)
+      .maybeSingle()
+    if (row?.user_id) return row.user_id
+  }
+  return null
+}
+
+async function upsertSubscriptionRow(sub: Stripe.Subscription, userId?: string | null) {
+  const payload = {
+    stripe_subscription_id: sub.id,
+    stripe_customer_id: sub.customer as string,
+    user_id: userId ?? undefined, // only set if we have it
+    plan: sub.items.data[0]?.price?.id || null,
+    status: sub.status,
+    current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
+    current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+    cancel_at_period_end: sub.cancel_at_period_end ?? false
+  }
+  await supabaseAdmin.from('subscriptions').upsert(payload, { onConflict: 'stripe_subscription_id' })
+}
+
 // ========= MAIN HANDLER =========
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -213,49 +261,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).send(`Webhook Error: ${err.message}`)
     }
 
+    // Non-blocking event log (best-effort)
+    supabaseAdmin.from('webhook_event_logs')
+      .insert({ source: 'stripe', payload: event })
+      .catch(() => {})
+
     // 1) Send the correct email for this event (idempotent)
     await handleStripeEmails(event)
 
-    // 2) Keep YOUR existing Supabase syncing exactly as you had it
+    // 2) Keep DB in sync
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        const user_id = session.client_reference_id as string | null
+        const user_id = await resolveUserId({ session })
         const subId = (session.subscription as string) || null
         if (user_id && subId) {
           const sub = await stripe.subscriptions.retrieve(subId)
-          await supabaseAdmin.from('subscriptions').upsert({
-            stripe_subscription_id: sub.id,
-            stripe_customer_id: sub.customer as string,
-            user_id,
-            plan: sub.items.data[0]?.price?.id || null,
-            status: sub.status,
-            current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-            current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-            cancel_at_period_end: sub.cancel_at_period_end ?? false
-          }, { onConflict: 'stripe_subscription_id' })
+          await upsertSubscriptionRow(sub, user_id)
         }
+        break
+      }
+
+      case 'customer.subscription.created': {
+        const sub = event.data.object as Stripe.Subscription
+        const user_id = await resolveUserId({ subscription: sub })
+        await upsertSubscriptionRow(sub, user_id)
         break
       }
 
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
-        await supabaseAdmin.from('subscriptions').upsert({
-          stripe_subscription_id: sub.id,
-          stripe_customer_id: sub.customer as string,
-          // user_id unchanged (from initial insert)
-          plan: sub.items.data[0]?.price?.id || null,
-          status: sub.status,
-          current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-          current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-          cancel_at_period_end: sub.cancel_at_period_end ?? false
-        }, { onConflict: 'stripe_subscription_id' })
+        // If we already have the row, upsert without changing user_id.
+        // If missing, try to resolve user and set it now.
+        const user_id = await resolveUserId({ subscription: sub })
+        await upsertSubscriptionRow(sub, user_id)
         break
       }
 
-      // You can add more DB cases if you want; not required for emails.
       default:
+        // ignore others for DB
         break
     }
 
