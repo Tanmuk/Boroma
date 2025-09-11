@@ -1,208 +1,234 @@
-// pages/signup.tsx
-import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/router'
-import { supabase } from '@/lib/supabaseClient'
+import { useState, useMemo } from "react";
+import Head from "next/head";
+import { useRouter } from "next/router";
+import { createBrowserSupabaseClient } from "@supabase/auth-helpers-nextjs";
 
-type Plan = 'monthly' | 'annual'
+type Plan = "monthly" | "annual";
 
-function normalizeUSPhone(input: string) {
-  // keep digits only
-  const d = (input || '').replace(/\D/g, '')
-  // 10 digits -> +1XXXXXXXXXX
-  if (d.length === 10) return { e164: `+1${d}`, digits: d }
-  // 11 digits starting with 1 -> +1XXXXXXXXXX
-  if (d.length === 11 && d.startsWith('1')) return { e164: `+${d}`, digits: d.slice(1) }
-  // already looks like +E164 US?
-  if (input.startsWith('+1') && d.length === 11) return { e164: input, digits: d.slice(1) }
-  return { e164: '', digits: '' }
+function toE164US(raw: string) {
+  // keeps digits, assumes US; you can swap for libphonenumber if you like
+  const d = (raw || "").replace(/\D/g, "");
+  if (!d) return "";
+  // allow 10 or 11 with leading 1
+  const core = d.length === 11 && d.startsWith("1") ? d.slice(1) : d;
+  return core.length === 10 ? `+1${core}` : `+${d}`; // last fallback
 }
 
-export default function Signup() {
-  const router = useRouter()
-  const plan = useMemo<Plan>(() => {
-    const p = (router.query.plan as string) || 'monthly'
-    return p === 'annual' ? 'annual' : 'monthly'
-  }, [router.query.plan])
+export default function SignUp() {
+  const router = useRouter();
+  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const plan = (router.query.plan as Plan) || "monthly";
 
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPwd, setShowPwd] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
 
-  // tiny password strength check – you asked to avoid “repeat password” field
-  const pwWeak =
-    password.length < 8 ||
-    !/[A-Z]/.test(password) ||
-    !/[a-z]/.test(password) ||
-    !/[0-9]/.test(password)
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    // if already signed in, just go pay
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) startCheckout().catch(() => {})
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const canSubmit =
+    fullName.trim().length > 1 &&
+    /\S+@\S+\.\S+/.test(email) &&
+    password.length >= 8 &&
+    toE164US(phone).length >= 11;
 
-  async function startCheckout() {
-    // called only after a session exists
-    const res = await fetch(`/api/checkout/start?plan=${plan}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ name, phone })
-    })
-    if (!res.ok) {
-      const txt = await res.text()
-      throw new Error(txt || 'Failed to create checkout session')
-    }
-    const { url } = await res.json()
-    window.location.href = url
-  }
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setNotice(null);
+    if (!canSubmit || submitting) return;
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-
-    // basic client validation
-    if (!name.trim()) return setError('Please enter your full name')
-    const normalized = normalizeUSPhone(phone)
-    if (!normalized.e164) return setError('Enter a valid US phone number (e.g., +1 555 555 0100)')
-    if (pwWeak) return setError('Password must be 8+ chars and include upper, lower and a number')
-
+    setSubmitting(true);
     try {
-      setLoading(true)
-
-      // 1) create account (if already exists Supabase returns error)
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+      // 1) Sign up (auto-confirm recommended in Supabase settings)
+      const { data, error: signErr } = await supabase.auth.signUp({
         email,
-        password
-      })
-      if (signUpErr && !/already registered/i.test(signUpErr.message)) {
-        throw signUpErr
+        password,
+        options: {
+          // include profile fields in user_metadata
+          data: { full_name: fullName, phone: toE164US(phone) },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (signErr) throw signErr;
+
+      // If email confirmation is ON, there is no session yet.
+      if (!data.session) {
+        setNotice(
+          "We’ve sent a confirmation link. Open it to finish sign-in, then return here to continue payment."
+        );
+        return;
       }
 
-      // 2) if the email was already registered, sign in; else sign in the new user
-      const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password })
-      if (signInErr) throw signInErr
+      const userId = data.user?.id;
+      if (!userId) throw new Error("Missing user id");
 
-      // 3) save the user profile (allowed by your RLS as the user themselves)
-      const { data: userRes } = await supabase.auth.getUser()
-      const userId = userRes.user?.id
-      if (userId) {
-        await supabase.from('profiles').upsert({
+      // 2) Upsert profile (safe with RLS = user_id = auth.uid())
+      const { error: profErr } = await supabase.from("profiles").upsert(
+        {
           id: userId,
-          full_name: name.trim(),
-          phone: normalized.e164,
-          phone_digits: normalized.digits
-        })
+          full_name: fullName,
+          email,
+          phone: toE164US(phone),
+        },
+        { onConflict: "id" }
+      );
+      if (profErr) throw profErr;
+
+      // 3) Ensure the first member row exists for this user (primary = true)
+      //    If you want the first "member" to be the actual senior, keep name/phone;
+      //    otherwise, you can leave as blank and let them add later in dashboard.
+      const { error: memErr } = await supabase.from("members").insert({
+        user_id: userId,
+        name: fullName,
+        phone: toE164US(phone),
+        is_primary: true,
+      });
+      // don't fail the flow if the row already exists (unique constraint)
+      if (memErr && !/duplicate|unique/i.test(memErr.message)) throw memErr;
+
+      // 4) Start Stripe checkout (needs the Supabase auth cookie => user must be signed in)
+      const res = await fetch(`/api/checkout/start?plan=${plan}`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`Checkout failed (${res.status}) ${t}`);
       }
 
-      // 4) go to Stripe Checkout
-      await startCheckout()
+      const { url } = await res.json();
+      window.location.href = url;
     } catch (err: any) {
-      setLoading(false)
-      setError(err?.message || 'Something went wrong, please try again')
-      return
+      setError(err?.message || "Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   return (
-    <main className="container py-16">
-      <div className="max-w-xl mx-auto card p-6">
-        <h1 className="mb-1">Create your account</h1>
-        <p className="text-slate-600">
-          Enter your own information so you can manage your plan and add members later
-        </p>
+    <>
+      <Head>
+        <title>Create your account – Boroma</title>
+        <meta name="robots" content="noindex" />
+      </Head>
 
-        {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+      <main className="min-h-screen bg-gradient-to-b from-[#fde7c0] to-white">
+        <div className="max-w-xl mx-auto px-6 py-10">
+          <h1 className="text-4xl font-bold">Create your account</h1>
+          <p className="mt-2 text-slate-600">
+            Enter your own information so that you can manage your plan and add
+            members later.
+          </p>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium">Full name</label>
-            <input
-              className="w-full border rounded-xl p-3 mt-1"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Jane Doe"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Phone (US)</label>
-            <input
-              className="w-full border rounded-xl p-3 mt-1"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 555 555 0100"
-              inputMode="tel"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Email address</label>
-            <input
-              className="w-full border rounded-xl p-3 mt-1"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium">Password</label>
-              <button
-                type="button"
-                className="btn-link text-sm"
-                onClick={() => setShowPwd((s) => !s)}
-              >
-                {showPwd ? 'Hide' : 'Show'}
-              </button>
+          {error && (
+            <div className="mt-4 rounded-md bg-red-50 p-3 text-red-700 text-sm">
+              {error}
             </div>
-            <input
-              className="w-full border rounded-xl p-3 mt-1"
-              type={showPwd ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 chars, with A-Z, a-z and 0-9"
-              required
-            />
-            <p className={`text-xs mt-1 ${pwWeak ? 'text-amber-600' : 'text-green-700'}`}>
-              {pwWeak ? 'Weak password' : 'Looks good'}
+          )}
+          {notice && (
+            <div className="mt-4 rounded-md bg-amber-50 p-3 text-amber-800 text-sm">
+              {notice}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <div>
+              <label className="block text-sm mb-1">Full name</label>
+              <input
+                className="w-full rounded-md border px-3 py-2"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                autoComplete="name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Phone (US)</label>
+              <input
+                className="w-full rounded-md border px-3 py-2"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+1 555 010 0100"
+                inputMode="tel"
+                required
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Stored as {toE164US(phone) || "—"}.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Email address</label>
+              <input
+                className="w-full rounded-md border px-3 py-2"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                type="email"
+                autoComplete="email"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Password</label>
+              <div className="relative">
+                <input
+                  className="w-full rounded-md border px-3 py-2 pr-20"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  type={showPw ? "text" : "password"}
+                  minLength={8}
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((s) => !s)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-slate-600"
+                >
+                  {showPw ? "Hide" : "Show"}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                At least 8 characters.
+              </p>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!canSubmit || submitting}
+              className="w-full rounded-md bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 font-medium shadow-md hover:shadow-lg disabled:opacity-60"
+            >
+              {submitting ? "Working…" : "Continue to payment"}
+            </button>
+
+            <p className="text-xs text-slate-500">
+              Plan: {plan === "annual" ? "Annual" : "Monthly"}. By continuing
+              you agree to our{" "}
+              <a className="underline" href="/terms" target="_blank">
+                Terms
+              </a>{" "}
+              and{" "}
+              <a className="underline" href="/privacy" target="_blank">
+                Privacy
+              </a>
+              .
             </p>
-          </div>
 
-          <button className="btn btn-primary w-full" disabled={loading}>
-            {loading ? 'Please wait…' : 'Continue to payment'}
-          </button>
-
-          <p className="text-xs text-slate-600">
-            Plan: <strong>{plan === 'annual' ? 'Annual' : 'Monthly'}</strong>. By continuing you
-            agree to our{' '}
-            <Link className="btn-link" href="/terms">
-              Terms
-            </Link>{' '}
-            and{' '}
-            <Link className="btn-link" href="/privacy">
-              Privacy
-            </Link>
-            .
-          </p>
-
-          <p className="text-sm">
-            Already have an account? <Link className="btn-link" href="/login">Sign in</Link>
-          </p>
-        </form>
-      </div>
-    </main>
-  )
+            <p className="text-sm">
+              Already have an account?{" "}
+              <a className="text-orange-600 underline" href="/login">
+                Sign in
+              </a>
+            </p>
+          </form>
+        </div>
+      </main>
+    </>
+  );
 }
