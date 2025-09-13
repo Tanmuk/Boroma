@@ -1,165 +1,145 @@
-// pages/api/voice/route.ts
+// /pages/api/voice/route.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-/**
- * Twilio posts application/x-www-form-urlencoded. We disable Next's body parser
- * and parse the raw body ourselves so the handler works reliably.
- */
-export const config = { api: { bodyParser: false } }
+const TOLLFREE =
+  (process.env.NEXT_PUBLIC_TOLLFREE ||
+    process.env.TWILIO_TOLLFREE ||
+    process.env.NEXT_PUBLIC_PRIMARY_PHONE ||
+    '').trim()
+const VAPI_AGENT_NUMBER = (process.env.VAPI_AGENT_NUMBER || '').trim()
 
-// ---------- Helpers ----------
-function xml(body: string) {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`
+function last10(n?: string | null) {
+  if (!n) return ''
+  return String(n).replace(/[^\d]/g, '').slice(-10)
 }
 
-function sayAndHangup(message: string) {
-  return xml(`<Response><Say voice="alice">${message}</Say><Hangup/></Response>`)
+function xml(s: string) {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${s}`
 }
 
-function onlyDigits(s: string) {
-  return (s || '').replace(/\D/g, '')
-}
-function last10(s: string) {
-  const d = onlyDigits(s)
-  return d.slice(-10)
-}
+export const config = { api: { bodyParser: true } }
 
-function pickStr(v: unknown): string {
-  if (typeof v === 'string') return v
-  if (Array.isArray(v) && v.length) return String(v[0] ?? '')
-  return ''
-}
-
-async function readFormParams(req: NextApiRequest): Promise<Record<string, string>> {
-  if (req.method === 'GET') {
-    // Twilio can hit as GET during testing; support it.
-    const out: Record<string, string> = {}
-    for (const [k, v] of Object.entries(req.query)) out[k] = pickStr(v)
-    return out
-  }
-
-  // POST: read raw body and parse as URL-encoded
-  const raw = await new Promise<Buffer>((resolve, reject) => {
-    const chunks: Buffer[] = []
-    req.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)))
-    req.on('end', () => resolve(Buffer.concat(chunks)))
-    req.on('error', reject)
-  })
-
-  const p = new URLSearchParams(raw.toString('utf8'))
-  const out: Record<string, string> = {}
-  p.forEach((value, key) => (out[key] = value))
-  return out
-}
-
-// ---------- Main handler ----------
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    res.setHeader('Allow', 'POST, GET')
-    return res.status(405).send('Method Not Allowed')
-  }
+  // Twilio will POST; GET is allowed for manual debug in a browser
+  const method = req.method || 'GET'
+
+  const qFrom = (method === 'GET' ? (req.query.From as string) : (req.body?.From as string)) || ''
+  const qTo = (method === 'GET' ? (req.query.To as string) : (req.body?.To as string)) || ''
+  const debug = (method === 'GET' ? req.query.debug : undefined) ? true : false
+
+  const fromDigits = last10(qFrom)
+  const toDigits = last10(qTo)
+  const tollDigits = last10(TOLLFREE)
+
+  const envOk = !!TOLLFREE && !!VAPI_AGENT_NUMBER
+  let matchedMember: any = null
+  let active = false
+  let reason = ''
 
   try {
-    const params = await readFormParams(req)
-
-    // Twilio sends both; prefer From/To, but fall back to Caller/Called
-    const fromRaw = params.From || params.Caller || ''
-    const toRaw = params.To || params.Called || ''
-
-    // Normalize for DB matching and routing
-    const fromE164 = pickStr(fromRaw)
-    const toE164 = pickStr(toRaw)
-    const fromDigits = last10(fromE164)
-
-    // Your configured toll-free and agent numbers
-    const TOLLFREE = process.env.TWILIO_TOLLFREE || process.env.NEXT_PUBLIC_TOLLFREE || ''
-    const AGENT = process.env.VAPI_AGENT_NUMBER || ''
-
-    const tollfreeDigits = last10(TOLLFREE)
-    const callToIsTollfree = last10(toE164) === tollfreeDigits
-
-    // If this endpoint is only for the toll-free, you can keep this check strict.
-    // Otherwise you could relax it and still run the lookup.
-    if (!callToIsTollfree) {
-      res.setHeader('Content-Type', 'text/xml')
-      return res
-        .status(200)
-        .send(sayAndHangup('This number is not configured for this route.'))
-    }
-
-    // --- Member Lookup (phone or last 10) ---
-    const { data: member, error: mErr } = await supabaseAdmin
-      .from('members')
-      .select('id,user_id,phone,phone_digits,subscription_id')
-      .or(`phone.eq.${fromE164},phone_digits.eq.${fromDigits}`)
-      .maybeSingle()
-
-    if (mErr) {
-      // Fail safe: never expose internals to the caller
-      res.setHeader('Content-Type', 'text/xml')
-      return res
-        .status(200)
-        .send(sayAndHangup('Sorry, a system error occurred. Please try again later.'))
-    }
-
-    if (!member) {
-      // Non-member policy for toll-free: CTA only, then hang up (no trial forwarding)
-      res.setHeader('Content-Type', 'text/xml')
-      const msg =
-        'This number is for Boroma members. Please visit boroma dot site to start a plan.'
-      return res.status(200).send(sayAndHangup(msg))
-    }
-
-    // --- Subscription gating ---
-    let active = false
-    if (member.subscription_id) {
-      const { data: sub } = await supabaseAdmin
-        .from('subscriptions')
-        .select('status,current_period_end,cancel_at_period_end')
-        .eq('id', member.subscription_id)
+    // Only handle Toll-Free calls here; anything else gets a polite message
+    if (!envOk) {
+      reason = 'missing env'
+    } else if (toDigits !== tollDigits) {
+      reason = 'not tollfree'
+    } else if (!fromDigits) {
+      reason = 'no caller digits'
+    } else {
+      // Find member by last10 OR exact E.164
+      const { data: member, error } = await supabaseAdmin
+        .from('members')
+        .select(`
+          id, user_id, phone, phone_digits, subscription_id,
+          subscription:subscriptions!members_subscription_id_fkey (
+            id, user_id, status, current_period_end, cancel_at_period_end
+          )
+        `)
+        .or(`phone_digits.eq.${fromDigits},phone.eq.+${fromDigits}`)
         .maybeSingle()
 
-      if (sub) {
-        const stillInPeriod =
-          !sub.current_period_end || new Date(sub.current_period_end) > new Date()
-        active =
-          (sub.status === 'active' || sub.status === 'trialing') &&
-          stillInPeriod &&
-          (sub.cancel_at_period_end === false || sub.cancel_at_period_end == null)
+      if (error) {
+        reason = `db error: ${error.message}`
+      } else if (!member) {
+        reason = 'no member match'
+      } else {
+        matchedMember = member
+        const sub = member.subscription
+        if (!sub) {
+          reason = 'no subscription on member'
+        } else {
+          const now = new Date()
+          const cpe = sub.current_period_end ? new Date(sub.current_period_end) : null
+          const inPeriod = !!cpe && cpe.getTime() > now.getTime()
+          const statusOk = ['active', 'trialing'].includes(String(sub.status || '').toLowerCase())
+
+          active = !!(statusOk && inPeriod)
+          if (!active) reason = `status:${sub?.status} inPeriod:${inPeriod}`
+        }
       }
     }
 
+    if (debug || method === 'GET') {
+      // JSON debug view in the browser
+      res.status(200).json({
+        envOk,
+        input: { From: qFrom, To: qTo, fromDigits, toDigits, tollDigits },
+        matchedMember,
+        active,
+        reason,
+      })
+      return
+    }
+
+    res.setHeader('Content-Type', 'text/xml; charset=utf-8')
+
+    if (!envOk) {
+      return res.status(200).send(
+        xml(`<Response><Say voice="alice">Service is temporarily unavailable. Please try again later.</Say><Hangup/></Response>`)
+      )
+    }
+
+    if (toDigits !== tollDigits) {
+      // Not the toll-free → keep it simple
+      return res.status(200).send(
+        xml(`<Response><Say voice="alice">This number is not configured for voice at the moment.</Say><Hangup/></Response>`)
+      )
+    }
+
     if (!active) {
-      res.setHeader('Content-Type', 'text/xml')
-      const msg =
-        'Your Boroma plan is not active. Please visit your dashboard to manage billing.'
-      return res.status(200).send(sayAndHangup(msg))
+      // Non-member or inactive: members-only message
+      await supabaseAdmin.from('webhook_event_logs').insert({
+        source: 'voice.route.denied',
+        payload: { From: qFrom, To: qTo, fromDigits, reason } as any,
+      })
+      return res.status(200).send(
+        xml(`<Response><Say voice="alice">This number is for Boroma members. Please visit boroma dot site to start a plan.</Say><Hangup/></Response>`)
+      )
     }
 
-    // --- Forward to the Vapi Agent number ---
-    if (!AGENT) {
-      res.setHeader('Content-Type', 'text/xml')
-      return res
-        .status(200)
-        .send(sayAndHangup('Sorry, no agent line is configured.'))
-    }
+    // Member + active → forward to Vapi Agent
+    await supabaseAdmin.from('webhook_event_logs').insert({
+      source: 'voice.route.allowed',
+      payload: { From: qFrom, To: qTo, fromDigits, vapi: VAPI_AGENT_NUMBER } as any,
+    })
 
-    // Use your toll-free as callerId when dialing the agent
-    const dialXml = xml(
-      `<Response>
-         <Dial callerId="${TOLLFREE}" answerOnBridge="true" timeout="25">
-           <Number>${AGENT}</Number>
-         </Dial>
-       </Response>`
-    )
-
-    res.setHeader('Content-Type', 'text/xml')
-    return res.status(200).send(dialXml)
-  } catch {
-    res.setHeader('Content-Type', 'text/xml')
+    // NOTE: timeLimit=20 is for testing so you don’t spend credits. Remove it in prod.
+    const body = `
+      <Response>
+        <Dial answerOnBridge="true" timeLimit="20">
+          <Number>${VAPI_AGENT_NUMBER}</Number>
+        </Dial>
+      </Response>
+    `
+    return res.status(200).send(xml(body.trim()))
+  } catch (e: any) {
+    await supabaseAdmin.from('webhook_event_logs').insert({
+      source: 'voice.route.error',
+      payload: { message: e?.message || 'unknown', From: qFrom, To: qTo } as any,
+    })
+    res.setHeader('Content-Type', 'text/xml; charset=utf-8')
     return res
       .status(200)
-      .send(sayAndHangup('Sorry, a system error occurred. Please try again later.'))
+      .send(xml(`<Response><Say voice="alice">We’re sorry. An unexpected error occurred.</Say><Hangup/></Response>`))
   }
 }

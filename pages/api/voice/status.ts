@@ -2,65 +2,62 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-// Optional: if you want to reject non-Twilio requests, set TWILIO_AUTH_TOKEN in Vercel
-// and uncomment the signature check below.
-const TOLLFREE = (process.env.NEXT_PUBLIC_TOLLFREE || process.env.TWILIO_TOLLFREE || '').trim()
+const TOLLFREE =
+  (process.env.NEXT_PUBLIC_TOLLFREE ||
+    process.env.TWILIO_TOLLFREE ||
+    process.env.NEXT_PUBLIC_PRIMARY_PHONE ||
+    '').trim()
 
-// Normalizes any phone to E.164-ish and last-10-digits (US)
 function last10(n?: string | null) {
   if (!n) return ''
-  const digits = (n + '').replace(/[^\d]/g, '')
-  return digits.slice(-10)
+  return String(n).replace(/[^\d]/g, '').slice(-10)
 }
 
-// Minimal safe parser for Twilio’s form posts
-function getParam(req: NextApiRequest, key: string) {
+function param(req: NextApiRequest, key: string) {
   const b: any = req.body || {}
-  // Twilio posts urlencoded by default in production; Next parses it into req.body
   return b[key] ?? null
 }
 
 export const config = {
-  api: {
-    bodyParser: true, // Twilio sends application/x-www-form-urlencoded by default
-  },
+  api: { bodyParser: true }, // Twilio sends urlencoded by default
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed')
+  // Accept GET too so Twilio never gets a 405 warning
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return res.status(200).json({ ok: true, method: req.method })
+  }
 
   try {
-    const CallSid = getParam(req, 'CallSid') as string | null
-    const From = (getParam(req, 'From') as string | null) || ''
-    const To = (getParam(req, 'To') as string | null) || ''
-    const CallStatus = (getParam(req, 'CallStatus') as string | null) || '' // queued|ringing|in-progress|completed|busy|failed|no-answer|canceled
-    const CallDuration = Number(getParam(req, 'CallDuration') || 0) // present on completed
-    const Direction = (getParam(req, 'Direction') as string | null) || ''
-    const Timestamp = new Date().toISOString()
+    const CallSid = param(req, 'CallSid') as string | null
+    const From = (param(req, 'From') as string | null) || ''
+    const To = (param(req, 'To') as string | null) || ''
+    const CallStatus = (param(req, 'CallStatus') as string | null) || ''
+    const CallDuration = Number(param(req, 'CallDuration') || 0)
+    const Direction = (param(req, 'Direction') as string | null) || ''
+    const at = new Date().toISOString()
 
-    const fromDigits = last10(From)
-    const isTollfree = TOLLFREE && last10(To) === last10(TOLLFREE)
+    const info = {
+      CallSid, From, To, CallStatus, CallDuration, Direction, at,
+      isTollfree: !!TOLLFREE && last10(To) === last10(TOLLFREE),
+    }
 
-    // Always keep a raw event log for debugging
     await supabaseAdmin.from('webhook_event_logs').insert({
       source: 'twilio.status',
-      payload: {
-        CallSid, From, To, CallStatus, CallDuration, Direction, Timestamp, isTollfree,
-      } as any,
+      payload: info as any,
     })
 
-    // Only summarize toll-free calls; we don’t summarize trial line here
-    if (isTollfree && CallStatus === 'completed') {
-      // find member by last-10
+    if (info.isTollfree && CallStatus === 'completed') {
+      const digits = last10(From)
       const { data: member } = await supabaseAdmin
         .from('members')
         .select('id, phone, phone_digits')
-        .or(`phone.eq.+${fromDigits},phone_digits.eq.${fromDigits}`)
+        .or(`phone.eq.+${digits},phone_digits.eq.${digits}`)
         .maybeSingle()
 
       await supabaseAdmin.from('tollfree_call_logs').insert({
         member_id: member?.id ?? null,
-        phone: From,
+        phone: From || null,
         started_at: new Date(Date.now() - CallDuration * 1000).toISOString(),
         ended_at: new Date().toISOString(),
         duration_sec: isFinite(CallDuration) ? CallDuration : 0,
@@ -70,13 +67,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
     }
 
-    return res.json({ ok: true })
+    return res.status(200).json({ ok: true })
   } catch (e: any) {
-    // If logging fails, never break Twilio delivery
     await supabaseAdmin.from('webhook_event_logs').insert({
       source: 'twilio.status.error',
       payload: { message: e?.message || 'unknown', at: new Date().toISOString() } as any,
     })
-    return res.json({ ok: true })
+    return res.status(200).json({ ok: true })
   }
 }
