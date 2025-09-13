@@ -1,162 +1,165 @@
-// /pages/api/voice/route.ts
+// pages/api/voice/route.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
+/**
+ * Twilio posts application/x-www-form-urlencoded. We disable Next's body parser
+ * and parse the raw body ourselves so the handler works reliably.
+ */
 export const config = { api: { bodyParser: false } }
 
-// === ENV ===
-const TOLLFREE = (process.env.TWILIO_TOLLFREE || process.env.NEXT_PUBLIC_PRIMARY_PHONE || '').trim()
-const TRIAL_LINE = (process.env.TWILIO_TRIAL || process.env.NEXT_PUBLIC_TRIAL_PHONE || '').trim() // optional
-const VAPI_AGENT_NUMBER = (process.env.VAPI_AGENT_NUMBER || '').trim()
+// ---------- Helpers ----------
+function xml(body: string) {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`
+}
 
-// Small helper to read raw form body (Twilio posts application/x-www-form-urlencoded)
-async function readForm(req: NextApiRequest): Promise<Record<string, string>> {
-  const chunks: Buffer[] = []
-  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-  const body = Buffer.concat(chunks).toString('utf8')
-  const params = new URLSearchParams(body)
+function sayAndHangup(message: string) {
+  return xml(`<Response><Say voice="alice">${message}</Say><Hangup/></Response>`)
+}
+
+function onlyDigits(s: string) {
+  return (s || '').replace(/\D/g, '')
+}
+function last10(s: string) {
+  const d = onlyDigits(s)
+  return d.slice(-10)
+}
+
+function pickStr(v: unknown): string {
+  if (typeof v === 'string') return v
+  if (Array.isArray(v) && v.length) return String(v[0] ?? '')
+  return ''
+}
+
+async function readFormParams(req: NextApiRequest): Promise<Record<string, string>> {
+  if (req.method === 'GET') {
+    // Twilio can hit as GET during testing; support it.
+    const out: Record<string, string> = {}
+    for (const [k, v] of Object.entries(req.query)) out[k] = pickStr(v)
+    return out
+  }
+
+  // POST: read raw body and parse as URL-encoded
+  const raw = await new Promise<Buffer>((resolve, reject) => {
+    const chunks: Buffer[] = []
+    req.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)))
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', reject)
+  })
+
+  const p = new URLSearchParams(raw.toString('utf8'))
   const out: Record<string, string> = {}
-  params.forEach((v, k) => (out[k] = v))
+  p.forEach((value, key) => (out[key] = value))
   return out
 }
 
-function last10Digits(n: string | null | undefined) {
-  if (!n) return ''
-  const digits = (n + '').replace(/\D/g, '')
-  return digits.slice(-10)
-}
-
-function twiml(say: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response><Say voice="alice">${say}</Say></Response>`
-}
-
-function twimlDial(toNumber: string, callerId?: string): string {
-  const cid = callerId ? ` callerId="${callerId}"` : ''
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response><Dial${cid}><Number>${toNumber}</Number></Dial></Response>`
-}
-
-type MemberRow = {
-  id: string
-  phone: string | null
-  phone_digits: string | null
-  subscription_id: number | null
-}
-
-type SubRow = {
-  id: number
-  status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'inactive'
-  current_period_end: string | null
-  cancel_at_period_end: boolean | null
-}
-
+// ---------- Main handler ----------
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    res.setHeader('Allow', 'POST, GET')
+    return res.status(405).send('Method Not Allowed')
+  }
+
   try {
-    if (req.method !== 'POST') {
-      res.setHeader('Allow', 'POST')
-      return res.status(405).send('Method Not Allowed')
+    const params = await readFormParams(req)
+
+    // Twilio sends both; prefer From/To, but fall back to Caller/Called
+    const fromRaw = params.From || params.Caller || ''
+    const toRaw = params.To || params.Called || ''
+
+    // Normalize for DB matching and routing
+    const fromE164 = pickStr(fromRaw)
+    const toE164 = pickStr(toRaw)
+    const fromDigits = last10(fromE164)
+
+    // Your configured toll-free and agent numbers
+    const TOLLFREE = process.env.TWILIO_TOLLFREE || process.env.NEXT_PUBLIC_TOLLFREE || ''
+    const AGENT = process.env.VAPI_AGENT_NUMBER || ''
+
+    const tollfreeDigits = last10(TOLLFREE)
+    const callToIsTollfree = last10(toE164) === tollfreeDigits
+
+    // If this endpoint is only for the toll-free, you can keep this check strict.
+    // Otherwise you could relax it and still run the lookup.
+    if (!callToIsTollfree) {
+      res.setHeader('Content-Type', 'text/xml')
+      return res
+        .status(200)
+        .send(sayAndHangup('This number is not configured for this route.'))
     }
 
-    const p = await readForm(req)
-    const from = (p.From || '').trim()
-    const to   = (p.To || '').trim()
-    const fromDigits = last10Digits(from)
+    // --- Member Lookup (phone or last 10) ---
+    const { data: member, error: mErr } = await supabaseAdmin
+      .from('members')
+      .select('id,user_id,phone,phone_digits,subscription_id')
+      .or(`phone.eq.${fromE164},phone_digits.eq.${fromDigits}`)
+      .maybeSingle()
 
-    // Soft sanity logging
-    await supabaseAdmin.from('webhook_event_logs').insert({
-      source: 'twilio.voice.route',
-      payload: { to, from, fromDigits, env: { TOLLFREE, TRIAL_LINE, VAPI: !!VAPI_AGENT_NUMBER } }
-    })
-
-    // TRIAL LINE? (optional – if you use a separate “free trial” number)
-    if (TRIAL_LINE && to === TRIAL_LINE) {
-      if (!VAPI_AGENT_NUMBER) {
-        res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-        return res.status(200).send(twiml('Sorry, our system is not ready to accept trial calls yet.'))
-      }
-      res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-      return res.status(200).send(twimlDial(VAPI_AGENT_NUMBER, TRIAL_LINE))
+    if (mErr) {
+      // Fail safe: never expose internals to the caller
+      res.setHeader('Content-Type', 'text/xml')
+      return res
+        .status(200)
+        .send(sayAndHangup('Sorry, a system error occurred. Please try again later.'))
     }
 
-    // TOLLFREE: members-only
-    if (to === TOLLFREE) {
-      // 1) Find a member by E.164 or last-10 digits
-      const { data: members, error: mErr } = await supabaseAdmin
-        .from('members')
-        .select('id, phone, phone_digits, subscription_id')
-        .or(`phone.eq.${from},phone_digits.eq.${fromDigits}`)
-        .limit(1)
+    if (!member) {
+      // Non-member policy for toll-free: CTA only, then hang up (no trial forwarding)
+      res.setHeader('Content-Type', 'text/xml')
+      const msg =
+        'This number is for Boroma members. Please visit boroma dot site to start a plan.'
+      return res.status(200).send(sayAndHangup(msg))
+    }
 
-      if (mErr) {
-        await supabaseAdmin.from('webhook_event_logs').insert({
-          source: 'twilio.voice.route.error',
-          payload: { step: 'members.select', error: mErr.message, from, fromDigits }
-        })
-      }
-
-      const member = (members && members[0]) as MemberRow | undefined
-
-      if (!member || !member.subscription_id) {
-        // Not a recognized member phone
-        res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-        return res
-          .status(200)
-          .send(twiml('This number is for Boroma members. Please visit boroma.site to start a plan.'))
-      }
-
-      // 2) Verify subscription status
-      const { data: subs, error: sErr } = await supabaseAdmin
+    // --- Subscription gating ---
+    let active = false
+    if (member.subscription_id) {
+      const { data: sub } = await supabaseAdmin
         .from('subscriptions')
-        .select('id, status, current_period_end, cancel_at_period_end')
+        .select('status,current_period_end,cancel_at_period_end')
         .eq('id', member.subscription_id)
-        .limit(1)
+        .maybeSingle()
 
-      if (sErr) {
-        await supabaseAdmin.from('webhook_event_logs').insert({
-          source: 'twilio.voice.route.error',
-          payload: { step: 'subscriptions.select', error: sErr.message, subId: member.subscription_id }
-        })
+      if (sub) {
+        const stillInPeriod =
+          !sub.current_period_end || new Date(sub.current_period_end) > new Date()
+        active =
+          (sub.status === 'active' || sub.status === 'trialing') &&
+          stillInPeriod &&
+          (sub.cancel_at_period_end === false || sub.cancel_at_period_end == null)
       }
-
-      const sub = (subs && subs[0]) as SubRow | undefined
-      const now = new Date()
-
-      const periodEndOk =
-        sub?.current_period_end ? new Date(sub.current_period_end) > now : true
-
-      const isActive =
-        !!sub &&
-        (sub.status === 'active' || sub.status === 'trialing') &&
-        periodEndOk &&
-        !sub.cancel_at_period_end
-
-      if (!isActive) {
-        res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-        return res
-          .status(200)
-          .send(twiml('Your plan is not active. Please refresh status from your dashboard or update billing.'))
-      }
-
-      // 3) Forward member to Vapi agent
-      if (!VAPI_AGENT_NUMBER) {
-        res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-        return res.status(200).send(twiml('System misconfiguration: agent number is missing.'))
-      }
-
-      res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-      return res.status(200).send(twimlDial(VAPI_AGENT_NUMBER, TOLLFREE))
     }
 
-    // Any other numbers -> polite default
-    res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-    return res.status(200).send(twiml('Thanks for calling Boroma. Please use our toll-free member line.'))
-  } catch (e: any) {
-    await supabaseAdmin.from('webhook_event_logs').insert({
-      source: 'twilio.voice.route.exception',
-      payload: { message: e?.message || String(e) }
-    })
-    res.setHeader('Content-Type', 'text/xml; charset=utf-8')
-    return res.status(200).send(twiml('Sorry, a system error occurred.'))
+    if (!active) {
+      res.setHeader('Content-Type', 'text/xml')
+      const msg =
+        'Your Boroma plan is not active. Please visit your dashboard to manage billing.'
+      return res.status(200).send(sayAndHangup(msg))
+    }
+
+    // --- Forward to the Vapi Agent number ---
+    if (!AGENT) {
+      res.setHeader('Content-Type', 'text/xml')
+      return res
+        .status(200)
+        .send(sayAndHangup('Sorry, no agent line is configured.'))
+    }
+
+    // Use your toll-free as callerId when dialing the agent
+    const dialXml = xml(
+      `<Response>
+         <Dial callerId="${TOLLFREE}" answerOnBridge="true" timeout="25">
+           <Number>${AGENT}</Number>
+         </Dial>
+       </Response>`
+    )
+
+    res.setHeader('Content-Type', 'text/xml')
+    return res.status(200).send(dialXml)
+  } catch {
+    res.setHeader('Content-Type', 'text/xml')
+    return res
+      .status(200)
+      .send(sayAndHangup('Sorry, a system error occurred. Please try again later.'))
   }
 }
