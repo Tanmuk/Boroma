@@ -1,68 +1,82 @@
 // /pages/api/voice/status.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import twilio from 'twilio'
 
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  : null
+// Optional: if you want to reject non-Twilio requests, set TWILIO_AUTH_TOKEN in Vercel
+// and uncomment the signature check below.
+const TOLLFREE = (process.env.NEXT_PUBLIC_TOLLFREE || process.env.TWILIO_TOLLFREE || '').trim()
 
-function norm(n?: string) {
-  if (!n) return null
-  const d = n.replace(/[^\d+]/g, '')
-  if (d.startsWith('+')) return d
-  if (d.length === 10) return `+1${d}`
-  return `+${d}`
+// Normalizes any phone to E.164-ish and last-10-digits (US)
+function last10(n?: string | null) {
+  if (!n) return ''
+  const digits = (n + '').replace(/[^\d]/g, '')
+  return digits.slice(-10)
+}
+
+// Minimal safe parser for Twilio’s form posts
+function getParam(req: NextApiRequest, key: string) {
+  const b: any = req.body || {}
+  // Twilio posts urlencoded by default in production; Next parses it into req.body
+  return b[key] ?? null
+}
+
+export const config = {
+  api: {
+    bodyParser: true, // Twilio sends application/x-www-form-urlencoded by default
+  },
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Twilio posts x-www-form-urlencoded
-  const body = req.body || {}
-  const event = (body.CallStatus || body.DialCallStatus || '').toLowerCase() // initiated|ringing|in-progress|answered|completed
-  const callSid = body.CallSid || body.DialCallSid || ''
-  const from = norm(body.From)
-  const to = norm(body.To)
-
-  const user_id = (req.query.user as string) || null
-  const member_id = (req.query.member as string) || null
-  const source = (req.query.source as string) || 'tollfree'
-  const is_member_call = (req.query.memberCall as string) === '1'
+  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed')
 
   try {
-    if (event.includes('answered')) {
-      // Schedule a soft reminder SMS at T+1500s (25 min) to the caller
-      if (twilioClient && from) {
-        const sendAt = new Date(Date.now() + 1500 * 1000).toISOString()
-        await twilioClient.messages.create({
-          // If you have a Messaging Service SID, set messagingServiceSid here instead of 'from'
-          from: process.env.TWILIO_TOLLFREE,   // sender
-          to: from,                            // caller
-          body: 'Heads up, this Boroma call has 10 minutes remaining.',
-          scheduleType: 'fixed',
-          sendAt, // Twilio will schedule if your account has scheduling enabled; otherwise it sends now
-        } as any)
-      }
-      return res.status(200).json({ ok: true })
-    }
+    const CallSid = getParam(req, 'CallSid') as string | null
+    const From = (getParam(req, 'From') as string | null) || ''
+    const To = (getParam(req, 'To') as string | null) || ''
+    const CallStatus = (getParam(req, 'CallStatus') as string | null) || '' // queued|ringing|in-progress|completed|busy|failed|no-answer|canceled
+    const CallDuration = Number(getParam(req, 'CallDuration') || 0) // present on completed
+    const Direction = (getParam(req, 'Direction') as string | null) || ''
+    const Timestamp = new Date().toISOString()
 
-    if (event.includes('completed')) {
-      // Duration is in seconds: prefer DialCallDuration then CallDuration
-      const sec = Number(body.DialCallDuration || body.CallDuration || 0)
-      await supabaseAdmin.from('calls').insert({
-        user_id,
-        member_id,
-        from_number: from,
-        to_number: to,
-        seconds: isFinite(sec) ? sec : 0,
-        source,
-        is_member_call,
+    const fromDigits = last10(From)
+    const isTollfree = TOLLFREE && last10(To) === last10(TOLLFREE)
+
+    // Always keep a raw event log for debugging
+    await supabaseAdmin.from('webhook_event_logs').insert({
+      source: 'twilio.status',
+      payload: {
+        CallSid, From, To, CallStatus, CallDuration, Direction, Timestamp, isTollfree,
+      } as any,
+    })
+
+    // Only summarize toll-free calls; we don’t summarize trial line here
+    if (isTollfree && CallStatus === 'completed') {
+      // find member by last-10
+      const { data: member } = await supabaseAdmin
+        .from('members')
+        .select('id, phone, phone_digits')
+        .or(`phone.eq.+${fromDigits},phone_digits.eq.${fromDigits}`)
+        .maybeSingle()
+
+      await supabaseAdmin.from('tollfree_call_logs').insert({
+        member_id: member?.id ?? null,
+        phone: From,
+        started_at: new Date(Date.now() - CallDuration * 1000).toISOString(),
+        ended_at: new Date().toISOString(),
+        duration_sec: isFinite(CallDuration) ? CallDuration : 0,
+        status: 'completed',
+        is_trial: false,
+        notes: `Sid:${CallSid || ''}`,
       })
-      return res.status(200).json({ ok: true })
     }
 
-    return res.status(200).json({ ok: true })
-  } catch (e) {
-    console.error('voice status error', e)
-    return res.status(200).json({ ok: true })
+    return res.json({ ok: true })
+  } catch (e: any) {
+    // If logging fails, never break Twilio delivery
+    await supabaseAdmin.from('webhook_event_logs').insert({
+      source: 'twilio.status.error',
+      payload: { message: e?.message || 'unknown', at: new Date().toISOString() } as any,
+    })
+    return res.json({ ok: true })
   }
 }
