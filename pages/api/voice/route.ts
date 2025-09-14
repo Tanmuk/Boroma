@@ -2,40 +2,27 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-function last10(n?: string | null) {
-  if (!n) return ''
-  return (n.match(/\d/g) || []).join('').slice(-10)
-}
+// ---------- small helpers ----------
+const last10 = (n?: string | null) => (n ? (n.match(/\d/g) || []).join('').slice(-10) : '')
 
-function twimlSay(text: string) {
-  return `<?xml version="1.0" encoding="UTF-8"?>
+const twimlSay = (text: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="alice">${text}</Say>
   <Hangup/>
 </Response>`
-}
 
-/**
- * Build the TwiML that:
- *  - tells the caller their max minutes (optional)
- *  - bridges to the Vapi agent with a hard time limit
- */
-function twimlDialWithLimit(opts: {
+const twimlDialWithLimit = (opts: {
   agentNumber: string
   callerId: string
   maxSeconds?: number
-  preNoticeSeconds?: number // say "You have up to N minutes..."
-}) {
-  const { agentNumber, callerId, maxSeconds, preNoticeSeconds } = opts
-
+  preNoticeSeconds?: number
+}) => {
+  const { agentNumber, callerId, maxSeconds } = opts
   const minutes = maxSeconds && maxSeconds > 0 ? Math.max(1, Math.floor(maxSeconds / 60)) : null
-  const preNotice =
-    minutes
-      ? `<Say voice="alice">You have up to ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} for this call.</Say>`
-      : ''
-
+  const preNotice = minutes
+    ? `<Say voice="alice">You have up to ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} for this call.</Say>`
+    : ''
   const timeLimitAttr = maxSeconds && maxSeconds > 0 ? ` timeLimit="${maxSeconds}"` : ''
-
   return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   ${preNotice}
@@ -46,46 +33,49 @@ function twimlDialWithLimit(opts: {
 </Response>`
 }
 
+// ---------- handler ----------
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST')
-    res.status(405).end('Method Not Allowed')
+  // Always reply as TwiML
+  res.setHeader('Content-Type', 'text/xml')
+
+  // Be tolerant to any verb; Twilio should POST, but we won't 405 and break calls.
+  if (req.method === 'OPTIONS' || req.method === 'HEAD') {
+    res.status(200).send(twimlSay('')) // harmless no-op response
     return
   }
 
-  // ----- ENV -----
+  // Env (same names you already use)
   const TOLLFREE = process.env.NEXT_PUBLIC_TOLLFREE || process.env.TWILIO_TOLLFREE
   const VAPI_AGENT = process.env.VAPI_AGENT_NUMBER
 
-  // time limits (seconds)
   const MEMBER_MAX_SECONDS = Number(process.env.MEMBER_MAX_SECONDS || 0) || 0
   const MEMBER_SOFT_REMINDER_SECONDS = Number(process.env.MEMBER_SOFT_REMINDER_SECONDS || 0) || 0
-  // NOTE: TRIAL_MAX_SECONDS is used by your /api/voice/trial handler, not here.
-
-  res.setHeader('Content-Type', 'text/xml')
 
   if (!TOLLFREE || !VAPI_AGENT) {
     res.status(200).send(twimlSay('Configuration error.'))
     return
   }
 
+  // Twilio sends x-www-form-urlencoded by default.
+  // Accept from body or query (handy when you test in a browser)
   const From = typeof req.body?.From === 'string' ? req.body.From : (req.query.From as string | undefined)
   const To   = typeof req.body?.To   === 'string' ? req.body.To   : (req.query.To   as string | undefined)
 
   const fromDigits = last10(From)
   const toDigits   = last10(To)
   const tollDigits = last10(TOLLFREE)
-  const isTollFreeCall = toDigits === tollDigits
 
+  const isTollFreeCall = toDigits === tollDigits
   if (!isTollFreeCall) {
-    res.status(200).send(
-      twimlSay('This number is for Boroma members. Please visit boroma dot site to start a plan.')
-    )
+    // Never forward non-members from this line
+    res
+      .status(200)
+      .send(twimlSay('This number is for Boroma members. Please visit boroma dot site to start a plan.'))
     return
   }
 
   try {
-    // 1) Find member by last 10 digits
+    // 1) Find member by normalized phone
     const { data: member, error: mErr } = await supabaseAdmin
       .from('members')
       .select('id, user_id, phone, phone_digits, subscription_id')
@@ -96,18 +86,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       res.status(200).send(twimlSay('We are having trouble looking up your plan. Please try again later.'))
       return
     }
-
     if (!member) {
-      res.status(200).send(
-        twimlSay('This number is for Boroma members. Please visit boroma dot site to start a plan.')
-      )
+      res
+        .status(200)
+        .send(twimlSay('This number is for Boroma members. Please visit boroma dot site to start a plan.'))
       return
     }
 
-    // 2) Find subscription (prefer explicit member.subscription_id, else latest by user_id)
-    let subscription:
-      | { id: number; status: string | null; current_period_end: string | null; cancel_at_period_end: boolean | null }
-      | null = null
+    // 2) Get the subscription: prefer explicit member.subscription_id; else latest user sub
+    type SubRow = {
+      id: number
+      status: string | null
+      current_period_end: string | null
+      cancel_at_period_end: boolean | null
+    }
+    let subscription: SubRow | null = null
 
     if (member.subscription_id) {
       const { data, error } = await supabaseAdmin
@@ -135,24 +128,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const active = !!subscription && inGoodStatus && notEnded
 
     if (!active) {
-      res.status(200).send(
-        twimlSay('Your Boroma plan is not active. Please visit your dashboard to manage billing.')
-      )
+      res
+        .status(200)
+        .send(twimlSay('Your Boroma plan is not active. Please visit your dashboard to manage billing.'))
       return
     }
 
-    // 3) Active member → bridge to Vapi agent with a hard cap (and a pre-connect reminder)
+    // 3) Active member → forward to VAPI agent with a hard time limit
     res.status(200).send(
       twimlDialWithLimit({
         agentNumber: VAPI_AGENT,
         callerId: TOLLFREE,
         maxSeconds: MEMBER_MAX_SECONDS > 0 ? MEMBER_MAX_SECONDS : undefined,
-        preNoticeSeconds: MEMBER_SOFT_REMINDER_SECONDS > 0 ? MEMBER_SOFT_REMINDER_SECONDS : undefined
+        preNoticeSeconds:
+          MEMBER_SOFT_REMINDER_SECONDS > 0 ? MEMBER_SOFT_REMINDER_SECONDS : undefined,
       })
     )
   } catch {
-    res.status(200).send(
-      twimlSay('We are having trouble right now. Please try again later.')
-    )
+    res.status(200).send(twimlSay('We are having trouble right now. Please try again later.'))
   }
 }
