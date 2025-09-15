@@ -1,109 +1,136 @@
-// /pages/api/webhooks/vapi.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { emailShell } from '@/lib/email'         // if you have a shell helper; otherwise inline a minimal HTML
-import { sendEmail } from '@/lib/mailer'         // must exist in your project
-const ESCALATE_TO = 'designdelipro@gmail.com'
+import { sendEmail } from '@/lib/email'
 
-function last10(s?: string) {
-  return (s || '').replace(/\D/g, '').slice(-10)
-}
-
-// very defensive extractor – Vapi changes fields across providers; this hunts for a phone
-function extractPhone(payload: any): string | null {
-  const p =
-    payload?.phone ||
-    payload?.body?.message?.phone ||
-    payload?.body?.message?.call?.customer?.number ||
-    payload?.body?.message?.fromNumber ||
-    payload?.body?.message?.metadata?.from ||
-    null
-
-  if (typeof p === 'string' && last10(p).length === 10) return `+${last10(p)}`
-  // last resort: grep for a +1..........
-  const asText = JSON.stringify(payload || {})
-  const m = asText.match(/\+1\d{10}/)
-  if (m) return m[0]
-  return null
-}
-
-function extractSummary(payload: any): string | null {
-  const s =
-    payload?.summary ||
-    payload?.body?.message?.summary ||
-    payload?.body?.summary ||
-    null
-  return typeof s === 'string' && s.trim() ? s.trim() : null
-}
-
+/**
+ * POST /api/webhooks/vapi
+ * - Verifies our shared secret (accepts either header name).
+ * - Logs every event into webhook_event_logs.
+ * - On `end-of-call-report`, inserts into `calls` and emails the subscriber.
+ */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST')
-    return res.status(405).send('Method Not Allowed')
+    return res.status(405).json({ ok: false, error: 'Method Not Allowed' })
   }
 
-  const payload = req.body || {}
+  // --- signature (accept either header name so it matches your Vapi UI)
+  const secret = process.env.VAPI_WEBHOOK_SECRET
+  const provided =
+    (req.headers['x-boroma-secret'] as string | undefined) ??
+    (req.headers['x-boroma-signature'] as string | undefined)
 
-  // 1) store raw
-  await supabaseAdmin.from('webhook_event_logs').insert({
-    source: 'vapi_webhook',
-    payload,
-  })
+  if (!secret || !provided || provided !== secret) {
+    return res.status(401).json({ ok: false, error: 'Bad signature' })
+  }
 
-  // 2) see if there’s a useful summary
-  const summary = extractSummary(payload)
-  const phone = extractPhone(payload)
+  // Vapi posts JSON; Next will parse it, but be defensive if a string arrives.
+  const body: any = typeof req.body === 'string' ? safeJson(req.body) : (req.body || {})
 
-  if (!summary) return res.status(200).json({ ok: true }) // ignore non-summary events
+  // 1) Always log raw event for audit/diagnostics
+  try {
+    await supabaseAdmin.from('webhook_event_logs').insert({
+      source: 'vapi_webhook',
+      payload: body,
+    })
+  } catch {}
 
-  // 3) find the owner email
-  let toEmail: string | null = null
-  if (phone) {
-    const d10 = last10(phone)
-    // member by phone_digits or phone
-    const { data: member } = await supabaseAdmin
-      .from('members')
-      .select('id,user_id,subscription_id,phone,phone_digits')
-      .or(`phone.eq.+${d10},phone_digits.eq.${d10}`)
-      .maybeSingle()
+  const msgType = body?.type || body?.event || body?.message?.type
+  if (msgType !== 'end-of-call-report') {
+    // Only the final report writes to calls & emails the owner
+    return res.status(200).json({ ok: true, ignored: msgType ?? 'unknown' })
+  }
 
-    if (member?.subscription_id) {
-      const { data: sub } = await supabaseAdmin
-        .from('subscriptions')
-        .select('user_id,status')
-        .eq('id', member.subscription_id)
+  try {
+    const call = body.call || body?.message?.call || {}
+    const summary: string = body.summary || body?.message?.summary || ''
+
+    const startedAt = toIso(call.startedAt || call.started_at)
+    const endedAt   = toIso(call.endedAt   || call.ended_at)
+    const seconds   = num(call.durationSec || call.duration_sec || call.durationSeconds || call.duration_seconds)
+    const costCents = num((call.costUsd ?? call.cost_usd ?? 0) * 100)
+
+    const from = normalize(call.customer?.number || call.customerNumber || call.from || body.from)
+    const to   = normalize(call.assistant?.number || call.assistantNumber || call.to   || body.to)
+
+    const recordingUrl  = call.recordingUrl  || call.recording_url  || null
+    const transcriptUrl = call.transcriptUrl || call.transcript_url || null
+    const issue         = (call.tags && Array.isArray(call.tags) ? call.tags.join(', ') : '') || 'support'
+
+    // 2) Resolve subscriber from member phone (last 10)
+    const last10 = (from || '').slice(-10)
+    let ownerUserId: string | null = null
+    let memberId: string | null = null
+    let ownerEmail: string | null = null
+    let memberName = 'Member'
+
+    if (last10) {
+      const { data: m } = await supabaseAdmin
+        .from('members')
+        .select('id,name,user_id, profiles:profiles!inner(email)')
+        .eq('phone_digits', last10)
+        .limit(1)
         .maybeSingle()
 
-      if (sub?.user_id) {
-        const { data: prof } = await supabaseAdmin
-          .from('profiles')
-          .select('id,full_name,phone,email')
-          .eq('id', sub.user_id)
-          .maybeSingle()
-
-        if (prof?.email) toEmail = prof.email
+      if (m) {
+        ownerUserId = m.user_id
+        memberId = m.id
+        memberName = m.name || memberName
+        ownerEmail = m.profiles?.email || null
       }
     }
+
+    // 3) Persist into calls (matches your posted schema exactly)
+    await supabaseAdmin.from('calls').insert({
+      user_id: ownerUserId,
+      member_id: memberId,
+      is_member_call: true,
+      phone: from,                 // legacy/back-compat
+      from_number: from,
+      to_number: to,
+      started_at: startedAt,
+      ended_at: endedAt,
+      duration_seconds: seconds ?? null,
+      issue_type: issue,
+      resolved: true,
+      recording_url: recordingUrl,
+      transcript_url: transcriptUrl,
+      cost_cents: Number.isFinite(costCents ?? NaN) ? costCents : null,
+      source: 'vapi',
+    })
+
+    // 4) Email summary to the subscriber (idempotency key tied to call.id)
+    if (ownerEmail) {
+      const mins = seconds != null ? Math.round(seconds / 60) : null
+      const html = `
+        <h2>Boroma call summary</h2>
+        <p><b>Member:</b> ${esc(memberName)}</p>
+        ${summary ? `<p style="white-space:pre-wrap">${esc(summary)}</p>` : '<p>No summary provided.</p>'}
+        <p><b>From:</b> ${esc(from || '')} &nbsp; <b>To:</b> ${esc(to || '')}</p>
+        <p><b>Duration:</b> ${mins ?? '?'} min</p>
+        ${recordingUrl ? `<p><a href="${recordingUrl}">Recording</a></p>` : ''}
+        ${transcriptUrl ? `<p><a href="${transcriptUrl}">Transcript</a></p>` : ''}
+        <p><a href="https://www.boroma.site/dashboard">Open dashboard</a></p>
+      `
+      await sendEmail(ownerEmail, 'Boroma call summary', html, String(call.id || '') || undefined)
+    }
+
+    return res.json({ ok: true })
+  } catch (err) {
+    console.error('vapi handler error', err)
+    // Acknowledge so Vapi doesn’t retry forever; details are in webhook_event_logs.
+    return res.status(200).json({ ok: true })
   }
+}
 
-  // 4) send the summary email
-  const html =
-    emailShell?.({
-      title: 'Call summary',
-      intro:
-        'Here is the call summary from your Boroma assistant. You can reply to this email if anything looks off.',
-      bullets: [],
-      ctaText: 'Open Dashboard',
-      ctaHref: `${process.env.NEXT_PUBLIC_SITE_URL || 'https://boroma.site'}/dashboard`,
-      footnote: null,
-    })?.replace('</div></div><div', `<p style="white-space:pre-wrap;margin-top:16px">${summary}</p></div></div><div`) ||
-    `<div style="font-family:Inter,Arial,sans-serif"><h2>Call summary</h2><pre style="white-space:pre-wrap">${summary}</pre></div>`
-
-  const sendList = [toEmail || ESCALATE_TO]
-  // If we found the owner, also CC the escalation mailbox so you see everything early on
-  if (toEmail) sendList.push(ESCALATE_TO)
-
-  await Promise.all(sendList.map((addr) => sendEmail(addr, 'Boroma call summary', html)))
-
-  return res.status(200).json({ ok: true, emailed: !!toEmail })
+// ---------- utils ----------
+function safeJson(s: string) { try { return JSON.parse(s) } catch { return {} } }
+function num(v: any): number | null { const x = Number(v); return Number.isFinite(x) ? x : null }
+function toIso(v: any): string | null {
+  if (!v) return null
+  const d = typeof v === 'number' ? new Date(v * 1000) : new Date(v)
+  return isNaN(+d) ? null : d.toISOString()
+}
+function normalize(p?: string | null) { return p ? String(p).replace(/[^0-9+]/g, '') : null }
+function esc(s: string) {
+  return String(s).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as any)[m])
 }
