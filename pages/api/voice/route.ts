@@ -1,150 +1,229 @@
-// pages/api/voice/route.ts
+// /pages/api/voice/route.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { createClient } from '@supabase/supabase-js'
 
-// ---------- small helpers ----------
-const last10 = (n?: string | null) => (n ? (n.match(/\d/g) || []).join('').slice(-10) : '')
+// ---------- ENV ----------
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://boroma.site'
+const SUPABASE_URL = process.env.SUPABASE_URL as string
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY as string
 
-const twimlSay = (text: string) => `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="alice">${text}</Say>
-  <Hangup/>
-</Response>`
+// phone numbers
+const TOLLFREE = (process.env.TWILIO_TOLLFREE || process.env.NEXT_PUBLIC_TOLLFREE || '').trim()
+const TRIAL_NUMBER = (process.env.TRIAL_NUMBER || '').trim() // optional, if you want to keep trial line here
+const VAPI_AGENT_NUMBER = (process.env.VAPI_AGENT_NUMBER || '').trim()
 
-const twimlDialWithLimit = (opts: {
-  agentNumber: string
-  callerId: string
-  maxSeconds?: number
-  preNoticeSeconds?: number
-}) => {
-  const { agentNumber, callerId, maxSeconds } = opts
-  const minutes = maxSeconds && maxSeconds > 0 ? Math.max(1, Math.floor(maxSeconds / 60)) : null
-  const preNotice = minutes
-    ? `<Say voice="alice">You have up to ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} for this call.</Say>`
-    : ''
-  const timeLimitAttr = maxSeconds && maxSeconds > 0 ? ` timeLimit="${maxSeconds}"` : ''
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  ${preNotice}
-  <Say voice="alice">Connecting you to your Boroma support specialist.</Say>
-  <Dial callerId="${callerId}" answerOnBridge="true"${timeLimitAttr}>
-    <Number>${agentNumber}</Number>
-  </Dial>
-</Response>`
+// time limits (seconds). If you change these in Vercel, the next invocation reads the new values.
+const MEMBER_MAX_SECONDS = parseInt(process.env.MEMBER_MAX_SECONDS || '', 10) || 35 * 60 // 35m
+const MEMBER_SOFT_REMINDER_SECONDS = parseInt(process.env.MEMBER_SOFT_REMINDER_SECONDS || '', 10) || 25 * 60 // 25m (soft reminder handled by Vapi agent content)
+const TRIAL_MAX_SECONDS = parseInt(process.env.TRIAL_MAX_SECONDS || '', 10) || 8 * 60 // 8m
+
+// monthly cap for member calls (per subscription)
+const MEMBER_MAX_CALLS_PER_MONTH = parseInt(process.env.MEMBER_MAX_CALLS_PER_MONTH || '', 10) || 10
+
+// ---------- SUPABASE (admin) ----------
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: { persistSession: false }
+})
+
+// ---------- HELPERS ----------
+function xml(res: NextApiResponse, twiml: string) {
+  res.setHeader('Content-Type', 'text/xml; charset=utf-8')
+  res.status(200).send(twiml)
 }
 
-// ---------- handler ----------
+function last10(n?: string | null) {
+  if (!n) return ''
+  return (n.replace(/[^\d]/g, '')).slice(-10)
+}
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+type SubRow = {
+  id: number
+  user_id: string | null
+  status: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean | null
+}
+
+type MemberRow = {
+  id: string
+  user_id: string | null
+  phone: string
+  phone_digits: string | null
+  subscription_id: number | null
+}
+
+async function findMemberAndActiveSub(fromDigits: string) {
+  // 1) find member by exact last10_digits
+  const { data: mList, error: mErr } = await supabase
+    .from('members')
+    .select('id,user_id,phone,phone_digits,subscription_id')
+    .or(`phone.eq.+${fromDigits},phone_digits.eq.${fromDigits}`) // your data already stores with + in phone; also keep last10 match
+    .limit(1)
+
+  if (mErr) throw mErr
+  const member = (mList?.[0] as MemberRow) || null
+  if (!member) return { member: null, sub: null }
+
+  // 2) subscription by member.subscription_id or member.user_id
+  let sub: SubRow | null = null
+  if (member.subscription_id) {
+    const { data: s1, error: s1e } = await supabase
+      .from('subscriptions')
+      .select('id,user_id,status,current_period_start,current_period_end,cancel_at_period_end')
+      .eq('id', member.subscription_id)
+      .maybeSingle()
+    if (s1e) throw s1e
+    sub = (s1 as SubRow) || null
+  } else if (member.user_id) {
+    const { data: s2, error: s2e } = await supabase
+      .from('subscriptions')
+      .select('id,user_id,status,current_period_start,current_period_end,cancel_at_period_end')
+      .eq('user_id', member.user_id)
+      .order('current_period_start', { ascending: false })
+      .limit(1)
+    if (s2e) throw s2e
+    sub = (s2?.[0] as SubRow) || null
+  }
+
+  return { member, sub }
+}
+
+function isSubActive(sub: SubRow | null) {
+  if (!sub) return false
+  if (!sub.status) return false
+  const statusOk = ['active', 'trialing'].includes(sub.status)
+  const periodEndOk = !sub.current_period_end || new Date(sub.current_period_end) > new Date()
+  const notCancelled = !sub.cancel_at_period_end
+  return statusOk && periodEndOk && notCancelled
+}
+
+async function countCallsThisPeriod(memberId: string, sub: SubRow | null) {
+  if (!sub?.current_period_start || !sub.current_period_end) return 0
+  const { data, error } = await supabase
+    .from('tollfree_call_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('member_id', memberId)
+    .gte('started_at', sub.current_period_start)
+    .lte('started_at', sub.current_period_end)
+    .eq('status', 'completed')
+  if (error) throw error
+  return data ? (data as any).length || 0 : 0
+}
+
+// ---------- MAIN ----------
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Always reply as TwiML
-  res.setHeader('Content-Type', 'text/xml')
+  // Accept both POST (Twilio) and GET (manual)
+  const isPost = req.method === 'POST'
 
-  // Be tolerant to any verb; Twilio should POST, but we won't 405 and break calls.
-  if (req.method === 'OPTIONS' || req.method === 'HEAD') {
-    res.status(200).send(twimlSay('')) // harmless no-op response
-    return
-  }
+  // Twilio sends x-www-form-urlencoded. Next parses into req.body as an object. For GET we use query.
+  const p: any = isPost ? req.body : req.query
 
-  // Env (same names you already use)
-  const TOLLFREE = process.env.NEXT_PUBLIC_TOLLFREE || process.env.TWILIO_TOLLFREE
-  const VAPI_AGENT = process.env.VAPI_AGENT_NUMBER
-
-  const MEMBER_MAX_SECONDS = Number(process.env.MEMBER_MAX_SECONDS || 0) || 0
-  const MEMBER_SOFT_REMINDER_SECONDS = Number(process.env.MEMBER_SOFT_REMINDER_SECONDS || 0) || 0
-
-  if (!TOLLFREE || !VAPI_AGENT) {
-    res.status(200).send(twimlSay('Configuration error.'))
-    return
-  }
-
-  // Twilio sends x-www-form-urlencoded by default.
-  // Accept from body or query (handy when you test in a browser)
-  const From = typeof req.body?.From === 'string' ? req.body.From : (req.query.From as string | undefined)
-  const To   = typeof req.body?.To   === 'string' ? req.body.To   : (req.query.To   as string | undefined)
+  const From = p.From as string | undefined
+  const To = p.To as string | undefined
+  const CallSid = p.CallSid as string | undefined
 
   const fromDigits = last10(From)
-  const toDigits   = last10(To)
-  const tollDigits = last10(TOLLFREE)
+  const toDigits = last10(To)
+  const tollfreeDigits = last10(TOLLFREE)
+  const isTollfreeCall = toDigits === tollfreeDigits
 
-  const isTollFreeCall = toDigits === tollDigits
-  if (!isTollFreeCall) {
-    // Never forward non-members from this line
-    res
-      .status(200)
-      .send(twimlSay('This number is for Boroma members. Please visit boroma dot site to start a plan.'))
-    return
-  }
-
-  try {
-    // 1) Find member by normalized phone
-    const { data: member, error: mErr } = await supabaseAdmin
-      .from('members')
-      .select('id, user_id, phone, phone_digits, subscription_id')
-      .eq('phone_digits', fromDigits)
-      .maybeSingle()
-
-    if (mErr) {
-      res.status(200).send(twimlSay('We are having trouble looking up your plan. Please try again later.'))
-      return
-    }
-    if (!member) {
-      res
-        .status(200)
-        .send(twimlSay('This number is for Boroma members. Please visit boroma dot site to start a plan.'))
-      return
-    }
-
-    // 2) Get the subscription: prefer explicit member.subscription_id; else latest user sub
-    type SubRow = {
-      id: number
-      status: string | null
-      current_period_end: string | null
-      cancel_at_period_end: boolean | null
-    }
-    let subscription: SubRow | null = null
-
-    if (member.subscription_id) {
-      const { data, error } = await supabaseAdmin
-        .from('subscriptions')
-        .select('id, status, current_period_end, cancel_at_period_end')
-        .eq('id', member.subscription_id)
-        .maybeSingle()
-      if (!error) subscription = data
-    } else {
-      const { data, error } = await supabaseAdmin
-        .from('subscriptions')
-        .select('id, status, current_period_end, cancel_at_period_end')
-        .eq('user_id', member.user_id)
-        .order('current_period_end', { ascending: false })
-        .limit(1)
-      if (!error && data && data.length) subscription = data[0]
-    }
-
-    const now = Date.now()
-    const subStatus = (subscription?.status || '').toLowerCase()
-    const inGoodStatus = subStatus === 'active' || subStatus === 'trialing'
-    const notEnded =
-      !subscription?.current_period_end ||
-      new Date(subscription.current_period_end).getTime() > now
-    const active = !!subscription && inGoodStatus && notEnded
-
-    if (!active) {
-      res
-        .status(200)
-        .send(twimlSay('Your Boroma plan is not active. Please visit your dashboard to manage billing.'))
-      return
-    }
-
-    // 3) Active member → forward to VAPI agent with a hard time limit
-    res.status(200).send(
-      twimlDialWithLimit({
-        agentNumber: VAPI_AGENT,
-        callerId: TOLLFREE,
-        maxSeconds: MEMBER_MAX_SECONDS > 0 ? MEMBER_MAX_SECONDS : undefined,
-        preNoticeSeconds:
-          MEMBER_SOFT_REMINDER_SECONDS > 0 ? MEMBER_SOFT_REMINDER_SECONDS : undefined,
-      })
+  // defend against misroutes
+  if (!From || !To || !isTollfreeCall) {
+    return xml(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">This number is for Boroma members. Please visit boroma dot site to start a plan.</Say>
+  <Hangup/>
+</Response>`
     )
-  } catch {
-    res.status(200).send(twimlSay('We are having trouble right now. Please try again later.'))
   }
+
+  // --- membership lookup ---
+  let member: MemberRow | null = null
+  let sub: SubRow | null = null
+  try {
+    const r = await findMemberAndActiveSub(fromDigits)
+    member = r.member
+    sub = r.sub
+  } catch (e: any) {
+    // hard fail → be polite
+    return xml(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">We're having trouble verifying your plan. Please try again shortly.</Say>
+  <Hangup/>
+</Response>`
+    )
+  }
+
+  // deny non-members
+  if (!member || !isSubActive(sub)) {
+    // log a rejected attempt (optional; we log only successful route below to keep the table clean)
+    return xml(
+      res,
+      `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">Your Boroma plan is not active. Please visit your dashboard to manage billing.</Say>
+  <Hangup/>
+</Response>`
+    )
+  }
+
+  // enforce monthly cap
+  try {
+    const used = await countCallsThisPeriod(member.id, sub)
+    if (used >= MEMBER_MAX_CALLS_PER_MONTH) {
+      return xml(
+        res,
+        `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="alice">You have reached your monthly call limit for this member. Please upgrade or wait for the next billing cycle.</Say>
+  <Hangup/>
+</Response>`
+      )
+    }
+  } catch {
+    // if we can't count, don't silently fail the customer — let the call through
+  }
+
+  // create a live call log row now so the status callback can close it later
+  try {
+    await supabase.from('tollfree_call_logs').insert({
+      member_id: member.id,
+      phone: From,
+      started_at: nowIso(),
+      status: 'in_progress',
+      is_trial: false,
+      notes: CallSid || null // we use notes to stash CallSid in your current schema
+    })
+  } catch {
+    // don't block the call; logging can fail separately
+  }
+
+  // Build TwiML to bridge to Vapi agent. We enforce the Twilio timeLimit.
+  // Soft reminder at 25 mins is done by your Vapi agent script (content), not Twilio.
+  const statusCb = `${SITE.replace(/\/$/, '')}/api/voice/status`
+
+  const dialXml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Dial callerId="${TOLLFREE}"
+        timeLimit="${MEMBER_MAX_SECONDS}"
+        answerOnBridge="true"
+        record="false"
+        timeout="20"
+        statusCallback="${statusCb}"
+        statusCallbackEvent="initiated ringing answered completed"
+        statusCallbackMethod="POST">
+    <Number>${VAPI_AGENT_NUMBER}</Number>
+  </Dial>
+</Response>`
+
+  return xml(res, dialXml)
 }

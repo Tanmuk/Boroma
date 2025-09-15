@@ -1,3 +1,15 @@
+
+import type { NextApiRequest, NextApiResponse } from 'next'
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).send('<?xml version="1.0" encoding="UTF-8"?><Response><Reject/></Response>')
+  }
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8')
+
+  // ...your existing trial TwiML logic...
+}
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { digits } from '@/lib/phone';

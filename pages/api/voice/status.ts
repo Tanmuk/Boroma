@@ -2,77 +2,83 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-const TOLLFREE =
-  (process.env.NEXT_PUBLIC_TOLLFREE ||
-    process.env.TWILIO_TOLLFREE ||
-    process.env.NEXT_PUBLIC_PRIMARY_PHONE ||
-    '').trim()
-
 function last10(n?: string | null) {
-  if (!n) return ''
-  return String(n).replace(/[^\d]/g, '').slice(-10)
-}
-
-function param(req: NextApiRequest, key: string) {
-  const b: any = req.body || {}
-  return b[key] ?? null
-}
-
-export const config = {
-  api: { bodyParser: true }, // Twilio sends urlencoded by default
+  if (!n) return null
+  return n.replace(/[^0-9]/g, '').slice(-10) || null
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Accept GET too so Twilio never gets a 405 warning
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(200).json({ ok: true, method: req.method })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'Method Not Allowed' })
   }
 
   try {
-    const CallSid = param(req, 'CallSid') as string | null
-    const From = (param(req, 'From') as string | null) || ''
-    const To = (param(req, 'To') as string | null) || ''
-    const CallStatus = (param(req, 'CallStatus') as string | null) || ''
-    const CallDuration = Number(param(req, 'CallDuration') || 0)
-    const Direction = (param(req, 'Direction') as string | null) || ''
-    const at = new Date().toISOString()
+    // Twilio status webhooks are form-encoded by default.
+    // Next parses it into req.body (JSON). Keys we care about:
+    // CallStatus, CallSid, From, To, CallDuration
+    const b: any = req.body || {}
+    const callStatus = b.CallStatus || b.callStatus
+    const fromRaw = b.From || b.from
+    const toRaw = b.To || b.to
+    const durationSec = Number(b.CallDuration || b.callDuration || 0) || 0
 
-    const info = {
-      CallSid, From, To, CallStatus, CallDuration, Direction, at,
-      isTollfree: !!TOLLFREE && last10(To) === last10(TOLLFREE),
-    }
+    const fromDigits = last10(fromRaw)
 
+    // Log raw for debugging
     await supabaseAdmin.from('webhook_event_logs').insert({
       source: 'twilio.status',
-      payload: info as any,
+      payload: b
     })
 
-    if (info.isTollfree && CallStatus === 'completed') {
-      const digits = last10(From)
-      const { data: member } = await supabaseAdmin
+    // Resolve member from caller digits
+    let memberId: string | null = null
+    if (fromDigits) {
+      const { data: m } = await supabaseAdmin
         .from('members')
         .select('id, phone, phone_digits')
-        .or(`phone.eq.+${digits},phone_digits.eq.${digits}`)
+        .or(`phone.eq.+${fromDigits},phone_digits.eq.${fromDigits}`)
+        .limit(1)
         .maybeSingle()
+      memberId = m?.id || null
+    }
 
-      await supabaseAdmin.from('tollfree_call_logs').insert({
-        member_id: member?.id ?? null,
-        phone: From || null,
-        started_at: new Date(Date.now() - CallDuration * 1000).toISOString(),
-        ended_at: new Date().toISOString(),
-        duration_sec: isFinite(CallDuration) ? CallDuration : 0,
-        status: 'completed',
-        is_trial: false,
-        notes: `Sid:${CallSid || ''}`,
-      })
+    // Upsert a tollfree_call_logs row. If a prior row exists for this member
+    // and started recently, we update it; otherwise insert a new one.
+    if (memberId) {
+      // Try to find a "most recent" row in last 2 hours for this member
+      const { data: recent } = await supabaseAdmin
+        .from('tollfree_call_logs')
+        .select('id, started_at')
+        .eq('member_id', memberId)
+        .order('started_at', { ascending: false })
+        .limit(1)
+
+      const row = recent?.[0]
+
+      if (row) {
+        await supabaseAdmin
+          .from('tollfree_call_logs')
+          .update({
+            ended_at: new Date().toISOString(),
+            duration_sec: durationSec || null,
+            status: callStatus || 'completed'
+          })
+          .eq('id', row.id)
+      } else {
+        await supabaseAdmin.from('tollfree_call_logs').insert({
+          member_id: memberId,
+          phone: fromDigits ? `+${fromDigits}` : null,
+          started_at: new Date().toISOString(),
+          ended_at: new Date().toISOString(),
+          duration_sec: durationSec || null,
+          status: callStatus || 'completed'
+        })
+      }
     }
 
     return res.status(200).json({ ok: true })
-  } catch (e: any) {
-    await supabaseAdmin.from('webhook_event_logs').insert({
-      source: 'twilio.status.error',
-      payload: { message: e?.message || 'unknown', at: new Date().toISOString() } as any,
-    })
-    return res.status(200).json({ ok: true })
+  } catch (err: any) {
+    console.error('status.ts error', err)
+    return res.status(500).json({ ok: false, error: err?.message || 'server error' })
   }
 }
