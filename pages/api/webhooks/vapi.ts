@@ -1,187 +1,174 @@
 // pages/api/webhooks/vapi.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
-import { Resend } from 'resend'
 
-export const config = { api: { bodyParser: true } } // Vapi sends JSON
+export const config = { api: { bodyParser: false } }
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY || ''
-const FROM = 'Boroma <hello@boroma.site>'
-const ESCALATION_ALERT = 'designdelipro@gmail.com'
+async function readRaw(req: NextApiRequest) {
+  const chunks: Uint8Array[] = []
+  for await (const c of req) chunks.push(typeof c === 'string' ? Buffer.from(c) : c)
+  return Buffer.concat(chunks)
+}
+function parse(req: NextApiRequest, buf: Buffer) {
+  const ct = (req.headers['content-type'] || '').toLowerCase()
+  const txt = buf.toString('utf8').trim()
+  if (ct.includes('application/x-www-form-urlencoded')) {
+    const p = new URLSearchParams(txt)
+    const o: Record<string, string> = {}
+    p.forEach((v, k) => (o[k] = v))
+    try { if (o.payload) return JSON.parse(o.payload) } catch {}
+    return o
+  }
+  try { return JSON.parse(txt || '{}') } catch { return {} }
+}
+const last10 = (s?: string) => (s || '').replace(/[^\d]/g, '').slice(-10)
 
-// helpers
-const last10 = (n?: string | null) =>
-  (n || '').replace(/[^\d]/g, '').slice(-10) || null
-
-const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null
-
-async function email(to: string, subject: string, html: string) {
-  if (!resend) return
+async function trySendEmail(to: string, subject: string, html: string) {
   try {
+    const mod: any = await import('@/lib/mailer')
+    if (mod?.sendEmail) { await mod.sendEmail(to, subject, html); return }
+  } catch {}
+  try {
+    const { Resend } = await import('resend')
+    const resend = new Resend(process.env.RESEND_API_KEY)
+    const FROM = process.env.EMAIL_FROM || 'Boroma <hello@boroma.site>'
     await resend.emails.send({ from: FROM, to, subject, html })
-  } catch {
-    // don’t fail webhook on email errors
-  }
+  } catch {}
 }
 
-function htmlShell(title: string, body: string) {
-  return `
-  <div style="background:#f7fafc;padding:24px">
-    <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px">
-      <div style="padding:16px 20px;border-bottom:1px solid #e5e7eb;font-weight:700">Boroma</div>
-      <div style="padding:20px">
-        <h2 style="margin:0 0 8px 0;font:600 18px/1.3 system-ui">${title}</h2>
-        <div style="color:#111827;font:400 14px/1.5 system-ui">${body}</div>
-      </div>
-    </div>
-  </div>`
+function pickSummary(body: any): string {
+  const s =
+    body?.summary ||
+    body?.data?.summary ||
+    body?.message?.summary ||
+    body?.output?.summary ||
+    body?.call?.summary ||
+    ''
+  return typeof s === 'string' ? s : JSON.stringify(s || {}, null, 2)
 }
-
-// Look up subscriber’s email by the calling member’s phone
-async function findSubscriberEmailByCallerDigits(memberDigits: string) {
-  // 1) member by phone_digits
-  const { data: member, error: mErr } = await supabaseAdmin
-    .from('members')
-    .select('id, name, subscription_id')
-    .eq('phone_digits', memberDigits)
-    .maybeSingle()
-
-  if (!member || mErr) return { email: null as string | null, member }
-
-  if (!member.subscription_id) return { email: null, member }
-
-  // 2) subscription -> user_id (subscriber)
-  const { data: sub, error: sErr } = await supabaseAdmin
-    .from('subscriptions')
-    .select('user_id')
-    .eq('id', member.subscription_id)
-    .maybeSingle()
-
-  if (!sub || sErr || !sub.user_id) return { email: null, member }
-
-  // 3) auth user email (requires service role – you have supabaseAdmin)
-  try {
-    const { data } = await supabaseAdmin.auth.admin.getUserById(sub.user_id)
-    const email = (data?.user?.email as string) || null
-    return { email, member }
-  } catch {
-    return { email: null, member }
+function pickCustomerPhone(body: any): string | null {
+  const cands = [
+    body?.customerPhoneNumber,
+    body?.customer?.phoneNumber,
+    body?.customer?.number,
+    body?.data?.customerPhoneNumber,
+    body?.metadata?.customerPhoneNumber,
+    body?.call?.customerPhoneNumber,
+  ]
+  for (const c of cands) {
+    const d = last10(c)
+    if (d) return `+${d}`
   }
+  return null
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST')
-    return res.status(405).send('Method Not Allowed')
-  }
-
   try {
-    const payload = (req.body ?? {}) as any
+    if (req.method === 'GET') return res.status(200).json({ ok: true, probe: true })
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST, GET')
+      return res.status(405).json({ ok: false, error: 'Method Not Allowed' })
+    }
 
-    // Always save the raw payload for audit/debug
-    try {
-      await supabaseAdmin.from('webhook_event_logs').insert({
-        source: 'vapi',
-        payload
-      })
-    } catch {}
+    const buf = await readRaw(req)
+    const body: any = parse(req, buf)
+    const when = new Date().toISOString()
 
-    // Try to normalize a few fields we care about
-    const call = payload.call || payload.data || payload
-    const customerNum =
-      call?.customer?.number ||
-      call?.customer?.phoneNumber ||
-      call?.customer_phone_number ||
-      call?.from ||
-      payload?.customerPhoneNumber ||
-      null
-    const assistantNum =
-      call?.assistant?.phoneNumber ||
-      call?.assistant_phone_number ||
-      call?.to ||
-      null
+    await supabaseAdmin.from('webhook_event_logs').insert({
+      source: 'vapi_webhook',
+      payload: { when, body },
+    })
 
-    const fromDigits = last10(customerNum)
-    const toDigits = last10(assistantNum)
+    const summary = pickSummary(body)
+    const phone = pickCustomerPhone(body)
+    let memberId: string | null = null
+    let ownerUserId: string | null = null
 
-    const vapiSummary =
-      payload.summary ||
-      call?.summary ||
-      payload?.metadata?.summary ||
-      null
+    if (phone) {
+      // find member by phone / phone_digits
+      const d = last10(phone)
+      const { data: m } = await supabaseAdmin
+        .from('members')
+        .select('id, user_id')
+        .or(`phone.eq.+${d},phone_digits.eq.${d}`)
+        .limit(1)
+      if (m && m.length) {
+        memberId = m[0].id
+        ownerUserId = m[0].user_id
+      }
+    }
 
-    const callSid =
-      call?.twilio?.callSid ||
-      payload?.twilio?.callSid ||
-      payload?.callSid ||
-      payload?.metadata?.callSid ||
-      null
-
-    const endedReason =
-      payload.endedReason ||
-      call?.endedReason ||
-      payload?.reason ||
-      null
-
-    const durationSec =
-      Number(payload.durationSec || call?.durationSec || payload?.duration || 0)
-
-    // 1) Close the tollfree_call_logs row (defensive: also done by /voice/status)
-    if (callSid) {
-      await supabaseAdmin
+    // Fallback: last completed toll-free call in the last 20 minutes
+    if (!memberId) {
+      const { data: t } = await supabaseAdmin
         .from('tollfree_call_logs')
-        .update({
-          ended_at: new Date().toISOString(),
-          duration_sec: durationSec || null,
-          status: 'completed',
-          notes: callSid
-        })
-        .eq('notes', callSid)
-    }
+        .select('id, member_id, ended_at, status')
+        .eq('status', 'completed')
+        .gte('ended_at', new Date(Date.now() - 20 * 60 * 1000).toISOString())
+        .order('ended_at', { ascending: false })
+        .limit(1)
 
-    // 2) Email the subscriber a summary (if we can identify them)
-    if (fromDigits) {
-      const { email: subscriberEmail, member } = await findSubscriberEmailByCallerDigits(fromDigits)
-
-      if (subscriberEmail) {
-        const title = `Call summary for ${member?.name || `+${fromDigits}`}`
-        const bodyHtml = `
-          <p>Assistant number: ${toDigits ? `+${toDigits}` : 'n/a'}</p>
-          <p>Member: ${member?.name || 'n/a'} (${fromDigits ? `+${fromDigits}` : 'n/a'})</p>
-          <p>Duration: ${durationSec ? `${durationSec}s` : 'n/a'}</p>
-          ${vapiSummary ? `<h3 style="margin:16px 0 6px 0">Summary</h3><p>${String(vapiSummary).replace(/\n/g, '<br/>')}</p>` : `<p>No summary text was provided.</p>`}
-          ${endedReason ? `<p style="color:#6b7280">Ended reason: ${endedReason}</p>` : ''}
-        `
-        await email(subscriberEmail, title, htmlShell(title, bodyHtml))
-      }
-
-      // 3) Optional escalation: if Vapi tags this in any way, alert ops
-      const escalated =
-        payload.escalated === true ||
-        (Array.isArray(payload.tags) && payload.tags.some((t: string) => /escalate/i.test(t))) ||
-        /escalat/i.test(String(endedReason || ''))
-
-      if (escalated) {
-        const subject = `⚠️ Escalation: ${member?.name || `+${fromDigits}`}`
-        const body = `
-          <p>A call has requested escalation.</p>
-          <p><b>Member</b>: ${member?.name || 'n/a'} (${fromDigits ? `+${fromDigits}` : 'n/a'})</p>
-          <p><b>Reason</b>: ${endedReason || 'n/a'}</p>
-          ${vapiSummary ? `<p><b>Summary</b>: ${String(vapiSummary).replace(/\n/g, '<br/>')}</p>` : ''}
-        `
-        await email(ESCALATION_ALERT, subject, htmlShell(subject, body))
+      if (t && t.length && t[0].member_id) {
+        memberId = t[0].member_id
+        const { data: m } = await supabaseAdmin
+          .from('members')
+          .select('user_id')
+          .eq('id', memberId)
+          .maybeSingle()
+        ownerUserId = m?.user_id || null
       }
     }
 
-    return res.status(200).json({ received: true })
+    if (!ownerUserId) {
+      // Nowhere to email
+      await supabaseAdmin.from('webhook_event_logs').insert({
+        source: 'vapi_webhook_no_owner',
+        payload: { phone, summaryLen: summary?.length || 0 },
+      })
+      return res.status(200).json({ ok: true, note: 'no owner found' })
+    }
+
+    // Get owner email
+    const { data: p } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .eq('id', ownerUserId)
+      .maybeSingle()
+    const email = (p as any)?.email || null
+    if (!email) return res.status(200).json({ ok: true, note: 'owner has no email' })
+
+    const subject = 'Boroma call summary'
+    const html = `
+      <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+        <h2 style="margin:0 0 8px 0">Your Boroma call summary</h2>
+        ${phone ? `<p style="margin:0 0 12px 0">Caller: <strong>${phone}</strong></p>` : ''}
+        <pre style="white-space:pre-wrap;font-size:14px;line-height:1.5">${summary}</pre>
+      </div>
+    `
+    await trySendEmail(email, subject, html)
+
+    // Optional escalation alert
+    const looksEscalated =
+      body?.escalation === true ||
+      body?.data?.escalated === true ||
+      /escalat(e|ion)/i.test(JSON.stringify(body || {}))
+
+    if (looksEscalated && process.env.ESCALATION_EMAIL_TO) {
+      await trySendEmail(
+        process.env.ESCALATION_EMAIL_TO,
+        'Boroma escalation alert',
+        `<p>Escalation flagged for ${phone || 'unknown caller'}</p><pre>${summary}</pre>`
+      )
+    }
+
+    return res.status(200).json({ ok: true })
   } catch (e: any) {
     try {
       await supabaseAdmin.from('webhook_event_logs').insert({
-        source: 'vapi_error',
-        payload: { error: e?.message || String(e) }
+        source: 'vapi_webhook_error',
+        payload: { error: e?.message || String(e) },
       })
     } catch {}
-    // Don’t retry storm Vapi – acknowledge but note failure
-    return res.status(200).json({ received: true, error: true })
+    return res.status(200).json({ ok: false })
   }
 }
