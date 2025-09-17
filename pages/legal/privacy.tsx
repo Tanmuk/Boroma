@@ -1,22 +1,69 @@
 export default function Privacy(){
   return (
     <main className="container py-16">
-      <h1>Privacy Policy</h1>
+      <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
       <p className="text-slate-600 mt-3 max-w-3xl">
-        Your trust matters, this policy explains what we collect and how we protect it
+        Your trust matters. This policy explains what we collect, how we use it, and your choices.
       </p>
 
       <section className="mt-6 text-slate-700 space-y-4 max-w-3xl">
-        <p><b>Information we collect,</b> account details such as name, email, phone, subscription status, call metadata such as time, duration, issue type, and call notes or step recaps, we do not store passwords or one time codes</p>
-        <p><b>How we use it,</b> to provide and improve support, to send call recaps, to prevent fraud and abuse, and to manage billing</p>
-        <p><b>Sharing,</b> we do not sell personal data, we share data only with service providers who help us run Boroma such as payment processing and hosting, they must protect your data and use it only to provide services to us</p>
-        <p><b>Recordings and transcripts,</b> calls may be recorded for quality, if a call is recorded we store it securely and delete it on a schedule, you can request deletion at any time at support@boroma.io</p>
-        <p><b>Security,</b> we use encryption in transit and at rest, strict access controls, and monitoring, no method is perfect but we work hard to protect your information</p>
-        <p><b>Your choices,</b> you can request a copy of your data, ask us to correct it, or ask us to delete it, contact support@boroma.io</p>
-        <p><b>Children,</b> Boroma is for adults, if we learn that a child under thirteen has provided personal information we will delete it</p>
-        <p><b>International transfers,</b> data may be processed in the United States, by using Boroma you agree to the transfer of your information to the United States</p>
-        <p><b>Updates,</b> we may change this policy, if we make material changes we will notify you</p>
-        <p><b>Contact,</b> support@boroma.io</p>
+        <h2 className="text-xl font-semibold mt-6">What we collect</h2>
+        <p>
+          We collect only what’s needed to provide the service: your phone number, basic account/profile information,
+          call metadata (time, duration), call recordings and transcripts for up to 30 days, and short issue descriptions.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">How we use it</h2>
+        <p>
+          We use your information to provide and improve support, deliver call summaries to designated family members,
+          ensure quality and safety, prevent fraud and abuse, and manage billing.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">Family summaries</h2>
+        <p>
+          Sending summaries to family is a core feature. You can choose which family member(s) receive summaries and can
+          change recipients at any time.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">No selling of data</h2>
+        <p>
+          We never sell your information to third parties. We may share limited data with service providers who help us
+          operate Boroma (e.g., telephony, cloud hosting, payments). They are bound by contracts to protect your data and
+          use it only to provide services to us.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">Recordings and security</h2>
+        <p>
+          Calls may be recorded and transcribed for quality and safety. Recordings are encrypted at rest and in transit
+          and kept for up to 30 days, then deleted. While no method is perfect, we work hard to protect your information.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">Your choices</h2>
+        <p>
+          You can request a copy of your data, correct it, or ask us to delete it at any time. To make a request, email
+          <a href="mailto:hello@boroma.site" className="text-[#FF5B04] font-medium"> hello@boroma.site</a>.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">Children</h2>
+        <p>
+          Boroma is for adults. If we learn that a child under 13 has provided personal information, we will delete it.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">International transfers</h2>
+        <p>
+          Depending on your location, your data may be processed in countries with different data protection laws.
+          By using Boroma, you consent to these transfers as needed to provide the service.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">Updates</h2>
+        <p>
+          We may update this policy from time to time. If we make material changes, we will notify you by email or in-app.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6">Contact</h2>
+        <p>
+          Questions about privacy? Email <a href="mailto:hello@boroma.site" className="text-[#FF5B04] font-medium">hello@boroma.site</a>.
+        </p>
       </section>
     </main>
   )
