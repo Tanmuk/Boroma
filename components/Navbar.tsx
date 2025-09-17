@@ -21,36 +21,25 @@ export default function Navbar() {
         {/* Enlarged logo only (no brand text) */}
         <div className="flex items-center">
           <Link href="/" aria-label="Home" className="inline-flex items-center">
-            <Image
-              src="/Boroma logo.svg"
-              alt="Boroma"
-              width={80}
-              height={80}
-              priority
-            />
+            <Image src="/Boroma logo.svg" alt="Boroma" width={80} height={80} priority />
           </Link>
         </div>
 
-        {/* Desktop nav */}
+        {/* Desktop nav: now includes Sign in / Dashboard */}
         <nav className="hidden md:flex items-center gap-6">
           <Link href="/what-we-solve">What we solve</Link>
           <a href="/#how-it-works">How it works</a>
           <a href="/#pricing">Pricing</a>
+          {authed ? (
+            <Link href="/dashboard" className="text-slate-700 hover:text-slate-900">Dashboard</Link>
+          ) : (
+            <Link href="/login" className="text-slate-700 hover:text-slate-900">Sign in</Link>
+          )}
         </nav>
 
-        {/* Desktop actions (single primary CTA) */}
-        <div className="hidden md:flex items-center gap-3">
-          {!authed ? (
-            <>
-              <a href="/login" className="text-slate-700 hover:text-slate-900">Sign in</a>
-              <a href="/#pricing" className="btn btn-primary">Get 24/7 support now</a>
-            </>
-          ) : (
-            <>
-              <Link href="/dashboard" className="text-slate-700 hover:text-slate-900">Dashboard</Link>
-              <a href="/#pricing" className="btn btn-primary">Get 24/7 support now</a>
-            </>
-          )}
+        {/* Desktop actions: keep ONLY primary CTA */}
+        <div className="hidden md:flex items-center">
+          <a href="/#pricing" className="btn btn-primary">Get 24/7 support now</a>
         </div>
 
         {/* Mobile hamburger */}
@@ -60,7 +49,7 @@ export default function Navbar() {
           aria-label="Menu"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M4 7h16M4 12h16M4 17h16" stroke="#0f172a" strokeWidth="2" strokeLinecap="round"/>
+            <path d="M4 7h16M4 12h16M4 17h16" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" />
           </svg>
         </button>
       </div>
@@ -72,19 +61,14 @@ export default function Navbar() {
             <Link href="/what-we-solve" onClick={() => setOpen(false)}>What we solve</Link>
             <a href="/#how-it-works" onClick={() => setOpen(false)}>How it works</a>
             <a href="/#pricing" onClick={() => setOpen(false)}>Pricing</a>
-          </div>
-          <div className="px-4 py-3 grid gap-2">
-            {!authed ? (
-              <>
-                <a href="/login" className="w-full text-left text-slate-700">Sign in</a>
-                <a href="/#pricing" className="btn btn-primary w-full text-center">Get 24/7 support now</a>
-              </>
+            {authed ? (
+              <Link href="/dashboard" onClick={() => setOpen(false)} className="text-slate-700">Dashboard</Link>
             ) : (
-              <>
-                <Link href="/dashboard" className="w-full text-left text-slate-700" onClick={() => setOpen(false)}>Dashboard</Link>
-                <a href="/#pricing" className="btn btn-primary w-full text-center">Get 24/7 support now</a>
-              </>
+              <Link href="/login" onClick={() => setOpen(false)} className="text-slate-700">Sign in</Link>
             )}
+          </div>
+          <div className="px-4 py-3">
+            <a href="/#pricing" className="btn btn-primary w-full text-center">Get 24/7 support now</a>
           </div>
         </div>
       )}
