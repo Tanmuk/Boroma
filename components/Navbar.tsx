@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { TRIAL_NUMBER } from '@/lib/env.client'
 
 export default function Navbar() {
   const [open, setOpen] = useState(false)
@@ -16,72 +17,77 @@ export default function Navbar() {
   }, [])
 
   return (
-    <header className="bg-transparent relative">
-      <div className="container flex items-center justify-between h-16">
-        <Link href="/" className="flex items-center gap-2" aria-label="Boroma home">
-          <Image
-            src="/Boroma logo.svg"
-            alt="Boroma"
-            width={80}
-            height={28}
-            priority
-            className="h-7 w-auto"
-          />
-        </Link>
+    <header className="fixed top-0 inset-x-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200">
+      <div className="container mx-auto px-4 h-[64px] flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="inline-flex items-center gap-2">
+            <Image src="/Boroma logo.svg" alt="Boroma" width={28} height={28} priority />
+            <span className="font-semibold tracking-tight">Boroma</span>
+          </Link>
+        </div>
 
-        <nav className="hidden md:flex gap-6 text-sm font-medium text-slate-700">
-          <a href="/#how-it-works">How it works</a>
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-6">
           <Link href="/what-we-solve">What we solve</Link>
+          <a href="/#how-it-works">How it works</a>
           <a href="/#pricing">Pricing</a>
           <a href="/#faq">FAQ</a>
-          {authed ? (
-            <Link href="/dashboard">Dashboard</Link>
-          ) : (
-            <Link href="/login">Sign in</Link>
-          )}
+          <Link href="/blog">Blog</Link>
+          <Link href="/legal/pledge">Scam-Free Pledge</Link>
         </nav>
 
-        {/* Main CTA */}
-        <div className="hidden md:flex">
-          <a
-            href="/#pricing"
-            className="btn btn-primary hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]"
-          >
-            Unlock on demand support
-          </a>
+        {/* Desktop actions */}
+        <div className="hidden md:flex items-center gap-3">
+          {!authed ? (
+            <>
+              <a href="/login" className="text-slate-700 hover:text-slate-900">Sign in</a>
+              <a href="/#pricing" className="btn btn-primary">Get 24/7 support now</a>
+              <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
+            </>
+          ) : (
+            <>
+              <Link href="/dashboard" className="text-slate-700 hover:text-slate-900">Dashboard</Link>
+              <a href="/#pricing" className="btn btn-primary">Get 24/7 support now</a>
+              <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
+            </>
+          )}
         </div>
 
         {/* Mobile hamburger */}
         <button
-          aria-label="Open menu"
-          className="md:hidden p-2 text-slate-700"
+          className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-slate-300"
           onClick={() => setOpen(v => !v)}
+          aria-label="Menu"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="#0f172a" strokeWidth="2" strokeLinecap="round"/></svg>
         </button>
       </div>
 
+      {/* Mobile sheet */}
       {open && (
-        <div className="mobile-panel">
-          <a className="mobile-link" href="/#how-it-works" onClick={() => setOpen(false)}>How it works</a>
-          <Link className="mobile-link" href="/what-we-solve" onClick={() => setOpen(false)}>What we solve</Link>
-          <a className="mobile-link" href="/#pricing" onClick={() => setOpen(false)}>Pricing</a>
-          <a className="mobile-link" href="/#faq" onClick={() => setOpen(false)}>FAQ</a>
-          {authed ? (
-            <Link className="mobile-link" href="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
-          ) : (
-            <Link className="mobile-link" href="/login" onClick={() => setOpen(false)}>Sign in</Link>
-          )}
-          <div className="px-4 py-3">
-            <a
-              href="/#pricing"
-              className="btn btn-primary w-full text-center hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]"
-              onClick={() => setOpen(false)}
-            >
-              Unlock on demand support
-            </a>
+        <div className="md:hidden border-t border-slate-200 bg-white">
+          <div className="px-4 py-3 grid gap-3">
+            <Link href="/what-we-solve" onClick={() => setOpen(false)}>What we solve</Link>
+            <a href="/#how-it-works" onClick={() => setOpen(false)}>How it works</a>
+            <a href="/#pricing" onClick={() => setOpen(false)}>Pricing</a>
+            <a href="/#faq" onClick={() => setOpen(false)}>FAQ</a>
+            <Link href="/blog" onClick={() => setOpen(false)}>Blog</Link>
+            <Link href="/legal/pledge" onClick={() => setOpen(false)}>Scam-Free Pledge</Link>
+          </div>
+          <div className="px-4 py-3 grid gap-2">
+            {!authed ? (
+              <>
+                <a href="/login" className="w-full text-left text-slate-700">Sign in</a>
+                <a href="/#pricing" className="btn btn-primary w-full text-center">Get 24/7 support now</a>
+                <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline w-full text-center">Try a call for free</a>
+              </>
+            ) : (
+              <>
+                <Link href="/dashboard" className="w-full text-left text-slate-700" onClick={() => setOpen(false)}>Dashboard</Link>
+                <a href="/#pricing" className="btn btn-primary w-full text-center">Get 24/7 support now</a>
+                <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline w-full text-center">Try a call for free</a>
+              </>
+            )}
           </div>
         </div>
       )}

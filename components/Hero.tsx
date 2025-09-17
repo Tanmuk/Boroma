@@ -1,78 +1,37 @@
 import Image from 'next/image'
-import Link from 'next/link'
-
-const Check = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="12" fill="#FF5B04" fillOpacity="0.12"/>
-    <path d="M7 12.5l3 3 7-7" stroke="#FF5B04" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-)
-const CardIconPhone = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <rect x="5" y="2" width="14" height="20" rx="2" stroke="#FF5B04" strokeWidth="2"/>
-    <circle cx="12" cy="18" r="1.5" fill="#FF5B04"/>
-  </svg>
-)
-const CardIconShield = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" stroke="#FF5B04" strokeWidth="2"/>
-    <path d="M9.5 12.2l2 2 3.8-4.2" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-)
+import { TRIAL_NUMBER } from '@/lib/env.client'
 
 export default function Hero(){
-  const phone = process.env.NEXT_PUBLIC_PRIMARY_PHONE || '+1-555-0100'
   return (
-    <section className="container pt-6 pb-10 text-center relative">
-      <div className="flex justify-center mb-5">
-        <span className="eyebrow">Launch offer, Use code LAUNCH40 to get 40% off</span>
+    <section className="container mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12">
+      <div className="text-center">
+        <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
+          Make your first call free
+        </div>
+
+        <h1 className="max-w-[640px] mx-auto mt-4 text-3xl sm:text-5xl font-semibold tracking-tight">
+          On-demand, 24/7 tech help, with the patience your loved ones deserve
+        </h1>
+
+        <p className="max-w-[640px] mx-auto text-slate-600 mt-4">
+          Patient tech agents help with any device issue. No judgment, no rushing, no scams. Family stays informed with automatic summaries.
+        </p>
+
+        <div className="mt-6 flex justify-center gap-3">
+          <a href="/#pricing" className="btn btn-primary">Get 24/7 support now</a>
+          <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
+        </div>
       </div>
 
-      <h1 className="mx-auto max-w-5xl">
-        Unlimited 24/7 tech help, with the patience your loved ones deserve
-      </h1>
-      <p className="mx-auto max-w-2xl mt-3 text-lg text-slate-600">
-        Patient, jargon free assistance that fixes tech issues for seniors in one call, no app, no OTP codes, just a call
-      </p>
-
-      <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-        {/* Main CTA now scrolls to Pricing */}
-        <a href="/#pricing" className="btn btn-primary hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]">
-          Unlock unlimited support
-        </a>
-        <a href={`tel:${phone}`} className="btn btn-outline">Try a call for free</a>
-      </div>
-
-      <div className="mt-5 flex flex-col sm:flex-row gap-5 justify-center text-sm text-slate-700">
-        <div className="flex items-center gap-2 justify-center"><Check/><span>No waiting time</span></div>
-        <div className="flex items-center gap-2 justify-center"><Check/><span>Switch language mid sentence</span></div>
-        <div className="flex items-center gap-2 justify-center"><Check/><span>Report sent after call</span></div>
-      </div>
-
-      <div className="relative mt-10 mb-[-80px] z-[1]">
+      <div className="mt-10 relative">
         <Image
           src="/hero.avif"
-          alt="Grandma getting patient phone support"
-          width={1200}
-          height={600}
+          alt="Patient phone-first help"
+          width={1600}
+          height={900}
           className="w-full max-w-5xl mx-auto h-[320px] md:h-[420px] object-cover rounded-2xl border border-slate-200"
           priority
         />
-        {/* two small offset cards */}
-        <div className="hidden md:block absolute left-12 bottom-[-28px] w-60 bg-white border border-slate-200 rounded-xl p-4 text-left">
-          <div className="section-label">Phone first</div>
-          <div className="flex items-center gap-2 mt-1">
-            <CardIconPhone/><div className="font-semibold text-slate-900 text-base">Zero setup</div>
-          </div>
-          <p className="text-sm text-slate-600 mt-1">Works on any phone, no apps ever</p>
-        </div>
-        <div className="hidden md:block absolute right-12 bottom-[-28px] w-60 bg-white border border-slate-200 rounded-xl p-4 text-left">
-          <div className="section-label">Scam aware coaching</div>
-          <div className="flex items-center gap-2 mt-1">
-            <CardIconShield/><div className="font-semibold text-slate-900 text-base">Stay safe</div>
-          </div>
-          <p className="text-sm text-slate-600 mt-1">We teach red flags and safer habits</p>
-        </div>
       </div>
     </section>
   )
