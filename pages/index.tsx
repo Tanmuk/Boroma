@@ -21,20 +21,20 @@ export default function Home() {
       <section className="container mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12" id="hero">
         <div className="text-center">
           {/* Eyebrow */}
-          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
+          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFD09C] text-[#FF5B04]">
             Launch offer: Use code LAUNCH40 to get 40% off
           </div>
 
           {/* H1 */}
           <h1
             className="mx-auto mt-4 font-semibold leading-tight"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontWeight: 600, fontSize: '60px', maxWidth: '650px' }}
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontWeight: 600, fontSize: '60px', maxWidth: '1000px' }}
           >
             On-demand, 24/7 tech help, with the patience your loved ones deserve
           </h1>
 
           {/* Subcopy */}
-          <p className="mx-auto text-slate-600 mt-4 max-w-[650px]">
+          <p className="mx-auto text-slate-600 mt-4 max-w-[1000px]">
             Patient tech agents help with any device issue. No judgment, no rushing, no app downloads. Family stays informed with automatic summaries.
           </p>
 
