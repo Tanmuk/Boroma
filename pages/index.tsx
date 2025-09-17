@@ -1,163 +1,304 @@
-import Hero from '@/components/Hero'
-import Link from 'next/link'
+import Head from 'next/head'
 import Image from 'next/image'
-import { ISSUES } from '@/data/issues'
-import TrustPledge from '@/components/TrustPledge'
+import Link from 'next/link'
 import { useState } from 'react'
+import TrustPledge from '@/components/TrustPledge'
+import { TRIAL_NUMBER } from '@/lib/env.client'
 
-export default function Home(){
+export default function Home() {
   const [annual, setAnnual] = useState(false)
-  const priceMonthly = 29
-  const priceAnnual = 348
+  const mPrice = 29
+  const yPrice = 348
 
   return (
-    <main>
-      <Hero />
+    <>
+      <Head>
+        <title>Boroma — Patient 24/7 phone-first tech help for seniors</title>
+        <meta name="description" content="On-demand, 24/7 tech help with the patience your loved ones deserve. English, Spanish, Chinese. Toll-free line for members. Family gets summaries after each call." />
+      </Head>
 
-      {/* Problem */}
-      <section id="problem" className="container py-16 text-center">
-        <div className="section-label">The problem</div>
-        <h2 className="mt-2">Seniors need real help, today’s tools were not built for them</h2>
-        <p className="text-slate-600 mt-3 max-w-3xl mx-auto">
-          Hold music, confusing apps, language barriers, and pushy support that asks for passwords or OTP codes,
-          families want patient phone first help that fixes the issue safely in one call
-        </p>
-        <div className="grid md:grid-cols-3 gap-4 mt-6 text-left">
-          <div className="card p-6"><h3>Phone trees and long waits</h3><p className="text-slate-600 mt-2">Help should be instant, not after a long wait</p></div>
-          <div className="card p-6"><h3>App installs and remote access</h3><p className="text-slate-600 mt-2">We avoid screensharing and apps completely</p></div>
-          <div className="card p-6"><h3>Safety worries</h3><p className="text-slate-600 mt-2">Scams use confusion, we never take OTP codes or passwords</p></div>
-        </div>
-      </section>
-
-      {/* Solution */}
-      <section id="solution" className="container py-16 text-center">
-        <div className="section-label">Our solution</div>
-        <h2 className="mt-2">On demand, patient tech help that works over a simple phone call</h2>
-        <p className="text-slate-600 mt-3 max-w-3xl mx-auto">
-          We fix the common issues by phone step by step and send a written recap afterward. No apps, no screen sharing,
-          clear boundaries and a toll free line for members.
-        </p>
-        <div className="grid md:grid-cols-3 gap-4 mt-6 text-left">
-          <div className="card p-6"><h3>Phone first</h3><p className="text-slate-600 mt-2">Works on any phone, nothing to install</p></div>
-          <div className="card p-6"><h3>Scam aware coaching</h3><p className="text-slate-600 mt-2">We teach safe habits and guardrails</p></div>
-          <div className="card p-6"><h3>Post call recap</h3><p className="text-slate-600 mt-2">Step by step pictures by SMS so you can follow later</p></div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section id="how-it-works" className="container py-16">
-        <div className="section-label text-center">How it works</div>
-        <h2 className="mt-2 text-center">Easier than calling your grandchildren</h2>
-        <p className="text-slate-600 mt-3 max-w-3xl mx-auto text-center">
-          Three quick steps to get help fast, no apps, no codes, just a phone call
-        </p>
-        <div className="grid md:grid-cols-2 gap-8 items-center mt-6">
-          <div className="order-2 md:order-1">
-            <ol className="space-y-4">
-              <li className="card p-5">
-                <h3>1, Choose a plan and create your account</h3>
-                <p className="text-slate-600 mt-2">We give you your support number instantly</p>
-              </li>
-              <li className="card p-5">
-                <h3>2, Add family members</h3>
-                <p className="text-slate-600 mt-2">Only approved numbers can reach the toll free line</p>
-              </li>
-              <li className="card p-5">
-                <h3>3, Call when you need help</h3>
-                <p className="text-slate-600 mt-2">We fix the issue in one call and text a recap</p>
-              </li>
-            </ol>
+      {/* HERO */}
+      <section className="container mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12" id="hero">
+        <div className="text-center">
+          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
+            Make your first call free
           </div>
-          <div className="order-1 md:order-2">
-            <Image src="/howitworks.avif" alt="How it works" width={900} height={700} className="rounded-2xl w-full h-auto"/>
+
+          <h1 className="max-w-[640px] mx-auto mt-4 text-3xl sm:text-5xl font-semibold tracking-tight">
+            On-demand, 24/7 tech help, with the patience your loved ones deserve
+          </h1>
+
+          <p className="max-w-[640px] mx-auto text-slate-600 mt-4">
+            Patient tech agents help with any device issue. No judgment, no rushing, no scams. Family stays informed with automatic summaries.
+          </p>
+
+          <div className="mt-6 flex justify-center gap-3">
+            <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
+            <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
           </div>
         </div>
+
+        <div className="mt-10">
+          <Image
+            src="/hero.avif"
+            alt="Patient phone-first help"
+            width={1600}
+            height={900}
+            className="w-full max-w-5xl mx-auto h-[320px] md:h-[420px] object-cover rounded-2xl border border-slate-200"
+            priority
+          />
+        </div>
       </section>
 
-      {/* What we solve summary */}
-      <section id="what" className="container py-16 text-center">
-        <div className="section-label">What we solve</div>
-        <h2 className="mt-2">We cover most everyday issues, here are the popular ones</h2>
-        <p className="text-slate-600 mt-3 max-w-3xl mx-auto">From Wi-Fi and passwords to scam checks and phone settings</p>
-        <div className="grid md:grid-cols-3 gap-4 mt-6 text-left">
-          {ISSUES.slice(0,9).map(item => (
-            <div key={item.slug} className="card p-5">
-              <h3>{item.title}</h3>
-              <p className="text-slate-600 mt-2">{item.summary}</p>
-            </div>
+      {/* PROBLEM */}
+      <section id="problem" className="py-16 md:py-20" style={{ background: '#075056' }}>
+        <div className="container mx-auto px-4 text-white">
+          <div className="text-center">
+            <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold">The problem</div>
+            <h2 className="mt-2 max-w-[500px] mx-auto text-3xl font-semibold">
+              Seniors need help in their specific way, today’s tools were not built for them
+            </h2>
+            <p className="mt-3 max-w-2xl mx-auto opacity-90">
+              Hold music, confusing apps, language barriers and inconsistent advice add stress. Families need patient phone-first help
+              that simply fixes the issue, safely.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4 mt-8">
+            {[
+              'Timing issues: Waiting hours on hold during business hours only',
+              'Fear of judgement: Getting rushed through solutions they don’t understand',
+              'Safety worries: Worrying about scams asking for passwords or access code',
+            ].map((t, i) => (
+              <div key={i} className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/15">
+                <p>{t}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SOLUTION */}
+      <section id="solution" className="container mx-auto px-4 py-16">
+        <div className="text-center">
+          <div className="section-label text-[#FF5B04]">Our solution</div>
+          <h2 className="max-w-[640px] mx-auto text-3xl font-semibold mt-2">
+            Phone-first tech help designed for seniors
+          </h2>
+          <p className="text-slate-600 mt-3 max-w-2xl mx-auto">
+            Boroma&apos;s tech agents are trained specifically for senior comfort and safety:
+          </p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-8 items-start mt-8">
+          {/* Left list */}
+          <ul className="space-y-3">
+            {[
+              'Always patient — Never rushed, never judged, always kind',
+              'Speak your language — English, Spanish, Chinese, switch anytime',
+              'Scam-aware — Never ask for passwords, OTPs, or personal info',
+            ].map((t, i) => (
+              <li key={i} className="bg-white rounded-xl border border-slate-200 p-4">{t}</li>
+            ))}
+          </ul>
+
+          {/* Middle image */}
+          <div className="flex justify-center">
+            <Image
+              src="/solution.avif"
+              alt="Boroma solution"
+              width={700}
+              height={900}
+              className="rounded-2xl w-full max-w-[420px] border border-slate-200"
+            />
+          </div>
+
+          {/* Right list */}
+          <ul className="space-y-3">
+            {[
+              'Family-informed — You get summaries of what was fixed in email',
+              'Available 24/7 — Help when panic strikes, not just business hours',
+              'Phone-first — Works on any phone, no apps ever',
+            ].map((t, i) => (
+              <li key={i} className="bg-white rounded-xl border border-slate-200 p-4">{t}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="how-it-works" className="container mx-auto px-4 py-16">
+        <div className="text-center">
+          <div className="section-label text-[#FF5B04]">How it works</div>
+          <h2 className="max-w-[600px] mx-auto text-3xl font-semibold mt-2">Three simple steps to peace of mind</h2>
+          <p className="text-slate-600 mt-3 max-w-2xl mx-auto">No apps, no accounts, no passwords.</p>
+        </div>
+
+        <ol className="max-w-3xl mx-auto mt-8 space-y-5">
+          {[
+            ['Step 1: Your Parent Calls', 'Just one number to remember: 1-877-766-6307. No apps, no accounts, no passwords.'],
+            ['Step 2: Patient Help in Their Language', 'Our agents listen carefully, explain clearly, and work at your parent’s pace.'],
+            ['Step 3: You Stay Informed', 'Get a text summary of what happened, what was fixed, and any follow-up needed.'],
+          ].map(([h, d], i) => (
+            <li key={i} className="bg-white border border-slate-200 rounded-xl p-5">
+              <div className="flex items-start gap-3">
+                <span className="w-8 h-8 rounded-full bg-[#FFEDD9] text-[#FF5B04] grid place-content-center font-semibold">{`0${i + 1}`}</span>
+                <div>
+                  <div className="font-semibold">{h}</div>
+                  <div className="text-slate-600 mt-1">{d}</div>
+                </div>
+              </div>
+            </li>
           ))}
-        </div>
-        <div className="mt-6">
-          <Link href="/what-we-solve" className="btn btn-outline">View more</Link>
-        </div>
+        </ol>
       </section>
 
-      {/* Trust pledge */}
+      {/* SAFETY / PLEDGE */}
       <TrustPledge />
 
-      {/* Pricing */}
-      <section id="pricing" className="container py-16 text-center">
-        <div className="section-label">Pricing</div>
-        <h2 className="mt-2">Peace of mind for one fixed price</h2>
-        <p className="text-slate-600 mt-2">Cancel anytime, this is our introductory price, price may change in the future</p>
-
-        <div className="card p-8 mt-6 max-w-3xl mx-auto text-left">
-          {/* Toggle */}
-          <div className="flex items-center gap-3">
-            <div className="font-semibold">Plan</div>
-            <div
-              role="tablist"
-              aria-label="Billing period"
-              className="ml-auto inline-flex rounded-full border border-slate-200 p-1 bg-white"
-            >
-              <button
-                role="tab"
-                aria-selected={!annual}
-                className={`px-4 py-2 rounded-full text-sm font-medium ${!annual ? 'bg-[#FFEDD9] text-slate-900' : 'text-slate-600'}`}
-                onClick={() => setAnnual(false)}
-              >
-                Monthly
-              </button>
-              <button
-                role="tab"
-                aria-selected={annual}
-                className={`px-4 py-2 rounded-full text-sm font-medium ${annual ? 'bg-[#FFEDD9] text-slate-900' : 'text-slate-600'}`}
-                onClick={() => setAnnual(true)}
-              >
-                Annually
-              </button>
-            </div>
-          </div>
-
-          {/* Price + features */}
-          <div className="mt-4">
-            <div className="text-4xl font-semibold">
-              ${annual ? priceAnnual : priceMonthly}
-              <span className="text-base font-normal text-slate-500">/{annual ? 'yr' : 'mo'}</span>
-            </div>
-            <ul className="mt-4 space-y-2 text-slate-700">
-              <li>1, 24/7 phone first tech help</li>
-              <li>2, 10 calls per month, each call up to 35 minutes</li>
-              <li>3, Toll free number for paid members</li>
-              <li>4, Fridge magnet print</li>
-              <li>5, SMS step by step pictures</li>
-              <li>6, Scam aware guidance and guardrails</li>
-              <li>7, Covers common issues in any device</li>
-              <li>8, Multilingual, English, Spanish, Chinese</li>
-              <li>9, Works on any phone, no apps</li>
-              <li>10, Patient and kind agents all the way</li>
-            </ul>
-            <div className="mt-6 flex gap-3">
-              <Link
-                href={`/signup?plan=${annual ? 'annual' : 'monthly'}`}
-                className="btn btn-primary hover:shadow-[0_0_18px_rgba(255,91,4,0.45)]"
-              >
-                Unlock on demand support
-              </Link>
-            </div>
-          </div>
+      {/* TESTIMONIALS */}
+      <section id="testimonials" className="container mx-auto px-4 py-16">
+        <div className="text-center">
+          <div className="section-label text-[#FF5B04]">Testimonials</div>
+          <h2 className="max-w-[500px] mx-auto text-3xl font-semibold mt-2">Families who found peace of mind</h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4 mt-8">
+          {[
+            '“My 78-year-old mom calls Boroma instead of me at midnight when her iPad ‘breaks.’ The agents are so patient with her, and I get a text explaining it was just a software update. Worth every penny for my sanity.” — Maria C., San Diego',
+            '“Dad speaks mostly Spanish and regular tech support frustrated him. Boroma agents switch to Spanish immediately and explain everything clearly. He actually enjoys the calls now.” — Carlos R., Phoenix',
+            '“Mom was getting scam calls pretending to be tech support. Boroma agents taught her how to identify fake calls and now she feels confident. The family summaries help me stay involved without hovering.” — Jennifer L., Miami',
+          ].map((q, i) => (
+            <blockquote key={i} className="border rounded-xl p-5 bg-white">
+              <p className="text-slate-700">{q}</p>
+            </blockquote>
+          ))}
         </div>
       </section>
-    </main>
+
+      {/* PRICING */}
+      <section id="pricing" className="container mx-auto px-4 py-16">
+        <div className="text-center">
+          <div className="section-label text-[#FF5B04]">Pricing</div>
+          <h2 className="max-w-[500px] mx-auto text-3xl font-semibold mt-2">Peace of mind for one fixed price</h2>
+          <p className="text-slate-600 mt-3 max-w-2xl mx-auto">
+            Cancel anytime. Launch special may apply.
+          </p>
+        </div>
+
+        <div className="mt-8 grid lg:grid-cols-[1fr_380px] gap-8 items-start">
+          {/* Card */}
+          <div className="border rounded-2xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm uppercase text-[#FF5B04] font-semibold">Boroma Plan</div>
+                <div className="text-2xl font-semibold mt-1">{annual ? 'Annual' : 'Monthly'}</div>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm">
+                <span>Bill monthly</span>
+                <input type="checkbox" className="toggle" checked={annual} onChange={e => setAnnual(e.target.checked)} />
+                <span>Bill annually</span>
+              </label>
+            </div>
+
+            <div className="mt-4">
+              <div className="text-4xl font-semibold">
+                ${annual ? yPrice : mPrice}
+                <span className="text-base font-normal text-slate-500">/{annual ? 'yr' : 'mo'}</span>
+              </div>
+
+              <ul className="mt-4 space-y-2 text-slate-700">
+                <li>• 24/7 phone-first tech help</li>
+                <li>• Up to 10 calls/mo, 35 minutes each (25-min reminder)</li>
+                <li>• Toll-free number for paid members</li>
+                <li>• Fridge magnet print</li>
+                <li>• Call report after each call</li>
+                <li>• Scam-aware guidance & guardrails</li>
+                <li>• Covers common issues on any device</li>
+                <li>• Multilingual — English, Spanish, Chinese</li>
+                <li>• Works on any phone, no apps</li>
+                <li>• Patient, professional agents</li>
+              </ul>
+
+              <div className="mt-6 flex gap-3">
+                <Link href={`/signup?plan=${annual ? 'annual' : 'monthly'}`} className="btn btn-primary">
+                  Get 24/7 support now
+                </Link>
+                <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">
+                  Try a call for free
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Side promo */}
+          <aside className="border rounded-2xl p-6">
+            <div className="text-sm uppercase text-[#FF5B04] font-semibold">Launch special — 40% off</div>
+            <div className="mt-2">Use code: <span className="font-semibold">LAUNCH40</span></div>
+            <div className="text-slate-600 mt-1">⏰ This pricing ends October 31st, 2025</div>
+            <div className="text-slate-600 mt-1">New members after October pay $29/month</div>
+          </aside>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" className="container mx-auto px-4 py-16">
+        <div className="text-center">
+          <div className="section-label text-[#FF5B04]">FAQ</div>
+          <h2 className="max-w-[500px] mx-auto text-3xl font-semibold mt-2">Questions families ask us</h2>
+        </div>
+
+        <div className="max-w-3xl mx-auto mt-8">
+          {FAQ_ITEMS.map((qa, idx) => (
+            <details key={idx} className="border rounded-xl p-5 mb-3">
+              <summary className="cursor-pointer font-semibold">{qa.q}</summary>
+              <p className="text-slate-600 mt-2">{qa.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+    </>
   )
 }
+
+const FAQ_ITEMS = [
+  {
+    q: 'Is this real people or AI?',
+    a: "Our tech agents use AI to provide consistent, patient help 24/7. They're trained specifically for senior comfort and safety — no bad days, no rushed calls, no judgment."
+  },
+  {
+    q: "What if my parent doesn't speak English well?",
+    a: 'Perfect! Our agents speak English, Spanish, and Chinese fluently and can switch languages mid-conversation based on what’s most comfortable.'
+  },
+  {
+    q: 'Will they ask for passwords or access to devices?',
+    a: 'Never. Our Scam-Free Pledge guarantees we never request passwords, OTPs, banking information, or remote access to devices.'
+  },
+  {
+    q: "What happens if they can't solve the problem?",
+    a: "We handle 95% of common tech issues. When we can't solve something, we clearly explain why and provide specific next steps or referrals."
+  },
+  {
+    q: 'How do I know what happened during the call?',
+    a: 'You receive a detailed text summary within minutes of each call ending, explaining what was discussed and what was resolved.'
+  },
+  {
+    q: 'Can I get recordings of the calls?',
+    a: 'Yes, all calls are recorded up to 30 days and available upon request for quality and safety purposes.'
+  },
+  {
+    q: "What's the difference between the free trial and paid service?",
+    a: 'Free trial is one call per phone number with a time limit. Paid members get our dedicated toll-free line with 10 calls monthly, 35 minutes each.'
+  },
+  {
+    q: 'How quickly can someone answer?',
+    a: 'Typically under 2 minutes, 24/7. No hold music, no phone trees, just patient help.'
+  },
+  {
+    q: 'What if my parent calls too often?',
+    a: 'Most families use 3–4 calls monthly. If they reach the 10-call limit, additional calls are $4.99 each or they can upgrade.'
+  },
+  {
+    q: "Is my parent's information safe?",
+    a: 'Yes. We follow strict privacy protocols and never share personal information. See our Privacy Policy for full details.'
+  },
+]
