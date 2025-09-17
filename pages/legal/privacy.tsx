@@ -1,70 +1,94 @@
-export default function Privacy(){
+import Head from 'next/head'
+
+export default function Privacy() {
   return (
-    <main className="container py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-      <p className="text-slate-600 mt-3 max-w-3xl">
-        Your trust matters. This policy explains what we collect, how we use it, and your choices.
-      </p>
+    <>
+      <Head>
+        <title>Privacy Policy • Boroma</title>
+        <meta name="description" content="Privacy practices for Boroma." />
+      </Head>
 
-      <section className="mt-6 text-slate-700 space-y-4 max-w-3xl">
-        <h2 className="text-xl font-semibold mt-6">What we collect</h2>
-        <p>
-          We collect only what’s needed to provide the service: your phone number, basic account/profile information,
-          call metadata (time, duration), call recordings and transcripts for up to 30 days, and short issue descriptions.
-        </p>
+      <section className="relative isolate">
+        <div className="absolute inset-0 bg-[#FFF6EB]" />
+        <main className="container relative z-10 mx-auto px-4 pt-28 pb-24 min-h-[80vh]">
+          <header className="max-w-3xl mx-auto">
+            <h1
+              className="text-4xl md:text-5xl font-semibold leading-tight"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}
+            >
+              Privacy Policy
+            </h1>
+            <p className="text-slate-700 mt-3">Effective: 2025</p>
+          </header>
 
-        <h2 className="text-xl font-semibold mt-6">How we use it</h2>
-        <p>
-          We use your information to provide and improve support, deliver call summaries to designated family members,
-          ensure quality and safety, prevent fraud and abuse, and manage billing.
-        </p>
+          <article className="max-w-3xl mx-auto mt-8 space-y-7 text-slate-800">
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>Data we collect</h2>
+              <p>
+                We collect only what’s needed to provide support: account details (name, email, phone), call metadata,
+                brief issue descriptions, and call recordings (for quality and safety).
+              </p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">Family summaries</h2>
-        <p>
-          Sending summaries to family is a core feature. You can choose which family member(s) receive summaries and can
-          change recipients at any time.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>How we use it</h2>
+              <p>
+                To deliver support, improve quality, prevent abuse, and send family summaries after each call (a core
+                feature of the service).
+              </p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">No selling of data</h2>
-        <p>
-          We never sell your information to third parties. We may share limited data with service providers who help us
-          operate Boroma (e.g., telephony, cloud hosting, payments). They are bound by contracts to protect your data and
-          use it only to provide services to us.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>Sharing</h2>
+              <p>
+                We don’t sell your data. We share with service providers (e.g., telephony, payments, hosting) under contracts
+                that restrict their use to our instructions.
+              </p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">Recordings and security</h2>
-        <p>
-          Calls may be recorded and transcribed for quality and safety. Recordings are encrypted at rest and in transit
-          and kept for up to 30 days, then deleted. While no method is perfect, we work hard to protect your information.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>Security & retention</h2>
+              <p>
+                Recordings are encrypted at rest and in transit and kept up to 30 days, then deleted. While no method is
+                perfect, we work hard to protect your information.
+              </p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">Your choices</h2>
-        <p>
-          You can request a copy of your data, correct it, or ask us to delete it at any time. To make a request, email
-          <a href="mailto:hello@boroma.site" className="text-[#FF5B04] font-medium"> hello@boroma.site</a>.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>Your choices</h2>
+              <p>
+                You may request a copy, correction, or deletion of your data at any time by emailing{' '}
+                <a className="text-[#FF5B04]" href="mailto:hello@boroma.site">hello@boroma.site</a>.
+              </p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">Children</h2>
-        <p>
-          Boroma is for adults. If we learn that a child under 13 has provided personal information, we will delete it.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>Children</h2>
+              <p>Boroma is for adults. If we learn that a child under 13 has provided personal information, we will delete it.</p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">International transfers</h2>
-        <p>
-          Depending on your location, your data may be processed in countries with different data protection laws.
-          By using Boroma, you consent to these transfers as needed to provide the service.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>International transfers</h2>
+              <p>
+                Depending on your location, data may be processed in other countries with different protections. By using
+                Boroma, you consent to these transfers as needed to provide the service.
+              </p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">Updates</h2>
-        <p>
-          We may update this policy from time to time. If we make material changes, we will notify you by email or in-app.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>Updates</h2>
+              <p>We may update this policy. If changes are material, we will notify you by email or in-app.</p>
+            </section>
 
-        <h2 className="text-xl font-semibold mt-6">Contact</h2>
-        <p>
-          Questions about privacy? Email <a href="mailto:hello@boroma.site" className="text-[#FF5B04] font-medium">hello@boroma.site</a>.
-        </p>
+            <section>
+              <h2 className="text-xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>Contact</h2>
+              <p>
+                Questions about privacy? Email <a className="text-[#FF5B04]" href="mailto:hello@boroma.site">hello@boroma.site</a>.
+              </p>
+            </section>
+          </article>
+        </main>
       </section>
-    </main>
+    </>
   )
 }
