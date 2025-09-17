@@ -18,23 +18,23 @@ export default function Home() {
       </Head>
 
       {/* HERO */}
-      <section className="container mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12" id="hero">
+      <section className="container mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12 min-h-[80vh]" id="hero">
         <div className="text-center">
           {/* Eyebrow */}
-          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFD09C] text-[#FF5B04]">
+          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
             Launch offer: Use code LAUNCH40 to get 40% off
           </div>
 
           {/* H1 */}
           <h1
             className="mx-auto mt-4 font-semibold leading-tight"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontWeight: 600, fontSize: '60px', maxWidth: '1000px' }}
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontWeight: 600, fontSize: '60px', maxWidth: '650px' }}
           >
             On-demand, 24/7 tech help, with the patience your loved ones deserve
           </h1>
 
           {/* Subcopy */}
-          <p className="mx-auto text-slate-600 mt-4 max-w-[1000px]">
+          <p className="mx-auto text-slate-600 mt-4 max-w-[650px]">
             Patient tech agents help with any device issue. No judgment, no rushing, no app downloads. Family stays informed with automatic summaries.
           </p>
 
@@ -46,15 +46,9 @@ export default function Home() {
 
           {/* Benefit chips */}
           <ul className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-2 text-slate-700">
-            <li className="flex items-center gap-2">
-              <CheckIcon /> <span>No waiting time</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckIcon /> <span>Switch language mid sentence</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckIcon /> <span>Report sent after call</span>
-            </li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>No waiting time</span></li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>Switch language mid sentence</span></li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>Report sent after call</span></li>
           </ul>
         </div>
 
@@ -65,7 +59,7 @@ export default function Home() {
             alt="Patient phone-first help"
             width={1600}
             height={1000}
-            className="w-full max-w-5xl mx-auto h-[420px] md:h-[520px] object-cover rounded-2xl border border-slate-200"
+            className="w-full max-w-5xl mx-auto h-[520px] md:h-[620px] object-cover rounded-2xl border border-slate-200"
             priority
           />
 
@@ -98,11 +92,14 @@ export default function Home() {
       </section>
 
       {/* PROBLEM */}
-      <section id="problem" className="py-16 md:py-20" style={{ background: '#075056' }}>
+      <section id="problem" className="py-16 md:py-20 min-h-[80vh]" style={{ background: '#075056' }}>
         <div className="container mx-auto px-4 text-white">
           <div className="text-center">
             <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold">The problem</div>
-            <h2 className="mt-2 max-w-[500px] mx-auto text-3xl font-semibold">
+            <h2
+              className="mt-2 mx-auto font-semibold leading-tight"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '760px' }}
+            >
               Seniors need help in their specific way, today’s tools were not built for them
             </h2>
             <p className="mt-3 max-w-2xl mx-auto opacity-90">
@@ -111,14 +108,24 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4 mt-8">
-            {[
-              'Timing issues: Waiting hours on hold during business hours only',
-              'Fear of judgement: Getting rushed through solutions they don’t understand',
-              'Safety worries: Worrying about scams asking for passwords or access code',
-            ].map((t, i) => (
-              <div key={i} className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/15">
-                <p>{t}</p>
+          <div className="grid md:grid-cols-3 gap-5 mt-10">
+            {PROBLEMS.map((card, i) => (
+              <div
+                key={i}
+                className="group bg-white/10 backdrop-blur rounded-2xl p-5 border border-white/15 hover:scale-[1.02] transition-transform"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="inline-grid place-items-center w-8 h-8 rounded-full bg-white/15 border border-white/20">
+                    {card.icon}
+                  </span>
+                  <div
+                    className="font-semibold"
+                    style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}
+                  >
+                    {card.title}
+                  </div>
+                </div>
+                <p className="mt-2 text-white/90">{card.desc}</p>
               </div>
             ))}
           </div>
@@ -126,10 +133,13 @@ export default function Home() {
       </section>
 
       {/* SOLUTION */}
-      <section id="solution" className="container mx-auto px-4 py-16">
+      <section id="solution" className="container mx-auto px-4 py-16 min-h-[80vh]" style={{ background: 'linear-gradient(180deg,#FFF3E8 0%,#FFFFFF 70%)' }}>
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">Our solution</div>
-          <h2 className="max-w-[640px] mx-auto text-3xl font-semibold mt-2">
+          <h2
+            className="mx-auto font-semibold mt-2"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '640px' }}
+          >
             Phone-first tech help designed for seniors
           </h2>
           <p className="text-slate-600 mt-3 max-w-2xl mx-auto">
@@ -138,21 +148,23 @@ export default function Home() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8 items-start mt-8">
-          {/* Left list */}
-          <ul className="space-y-3">
-            {[
-              'Always patient — Never rushed, never judged, always kind',
-              'Speak your language — English, Spanish, Chinese, switch anytime',
-              'Scam-aware — Never ask for passwords, OTPs, or personal info',
-            ].map((t, i) => (
-              <li key={i} className="bg-white rounded-xl border border-slate-200 p-4">{t}</li>
+          {/* Left column */}
+          <ul className="space-y-4">
+            {SOLUTION_LEFT.map((t, i) => (
+              <li key={i} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md hover:scale-[1.02] transition">
+                <div className="flex items-center gap-3">
+                  <span className="inline-grid place-items-center w-8 h-8 rounded-full bg-[#FFEDD9] border border-[#FFD9B8]">{t.icon}</span>
+                  <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{t.title}</div>
+                </div>
+                <p className="text-slate-600 mt-1">{t.desc}</p>
+              </li>
             ))}
           </ul>
 
           {/* Middle image */}
           <div className="flex justify-center">
             <Image
-              src="/solution.avif"
+              src="/Boroma solution.avif"
               alt="Boroma solution"
               width={700}
               height={900}
@@ -160,24 +172,31 @@ export default function Home() {
             />
           </div>
 
-          {/* Right list */}
-          <ul className="space-y-3">
-            {[
-              'Family-informed — You get summaries of what was fixed in email',
-              'Available 24/7 — Help when panic strikes, not just business hours',
-              'Phone-first — Works on any phone, no apps ever',
-            ].map((t, i) => (
-              <li key={i} className="bg-white rounded-xl border border-slate-200 p-4">{t}</li>
+          {/* Right column */}
+          <ul className="space-y-4">
+            {SOLUTION_RIGHT.map((t, i) => (
+              <li key={i} className="bg-white rounded-2xl border border-slate-200 p-5 hover:shadow-md hover:scale-[1.02] transition">
+                <div className="flex items-center gap-3">
+                  <span className="inline-grid place-items-center w-8 h-8 rounded-full bg-[#FFEDD9] border border-[#FFD9B8]">{t.icon}</span>
+                  <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{t.title}</div>
+                </div>
+                <p className="text-slate-600 mt-1">{t.desc}</p>
+              </li>
             ))}
           </ul>
         </div>
       </section>
 
       {/* HOW IT WORKS */}
-      <section id="how-it-works" className="container mx-auto px-4 py-16">
+      <section id="how-it-works" className="container mx-auto px-4 py-16 min-h-[80vh]">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">How it works</div>
-          <h2 className="max-w-[600px] mx-auto text-3xl font-semibold mt-2">Three simple steps to peace of mind</h2>
+          <h2
+            className="mx-auto font-semibold mt-2"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
+          >
+            Three simple steps to peace of mind
+          </h2>
           <p className="text-slate-600 mt-3 max-w-2xl mx-auto">No apps, no accounts, no passwords.</p>
         </div>
 
@@ -191,7 +210,7 @@ export default function Home() {
               <div className="flex items-start gap-3">
                 <span className="w-8 h-8 rounded-full bg-[#FFEDD9] text-[#FF5B04] grid place-content-center font-semibold">{`0${i + 1}`}</span>
                 <div>
-                  <div className="font-semibold">{h}</div>
+                  <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{h}</div>
                   <div className="text-slate-600 mt-1">{d}</div>
                 </div>
               </div>
@@ -204,10 +223,15 @@ export default function Home() {
       <TrustPledge />
 
       {/* TESTIMONIALS */}
-      <section id="testimonials" className="container mx-auto px-4 py-16">
+      <section id="testimonials" className="container mx-auto px-4 py-16 min-h-[80vh]">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">Testimonials</div>
-          <h2 className="max-w-[500px] mx-auto text-3xl font-semibold mt-2">Families who found peace of mind</h2>
+          <h2
+            className="mx-auto font-semibold mt-2"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '500px' }}
+          >
+            Families who found peace of mind
+          </h2>
         </div>
         <div className="grid md:grid-cols-3 gap-4 mt-8">
           {[
@@ -223,10 +247,15 @@ export default function Home() {
       </section>
 
       {/* PRICING */}
-      <section id="pricing" className="container mx-auto px-4 py-16">
+      <section id="pricing" className="container mx-auto px-4 py-16 min-h-[80vh]">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">Pricing</div>
-          <h2 className="max-w-[500px] mx-auto text-3xl font-semibold mt-2">Peace of mind for one fixed price</h2>
+          <h2
+            className="mx-auto font-semibold mt-2"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '500px' }}
+          >
+            Peace of mind for one fixed price
+          </h2>
           <p className="text-slate-600 mt-3 max-w-2xl mx-auto">
             Cancel anytime. Launch special may apply.
           </p>
@@ -288,16 +317,21 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="container mx-auto px-4 py-16">
+      <section id="faq" className="container mx-auto px-4 py-16 min-h-[80vh]">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">FAQ</div>
-          <h2 className="max-w-[500px] mx-auto text-3xl font-semibold mt-2">Questions families ask us</h2>
+          <h2
+            className="mx-auto font-semibold mt-2"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '500px' }}
+          >
+            Questions families ask us
+          </h2>
         </div>
 
         <div className="max-w-3xl mx-auto mt-8">
           {FAQ_ITEMS.map((qa, idx) => (
             <details key={idx} className="border rounded-xl p-5 mb-3">
-              <summary className="cursor-pointer font-semibold">{qa.q}</summary>
+              <summary className="cursor-pointer font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{qa.q}</summary>
               <p className="text-slate-600 mt-2">{qa.a}</p>
             </details>
           ))}
@@ -306,6 +340,115 @@ export default function Home() {
     </>
   )
 }
+
+/* ---------- UI helpers & content ---------- */
+
+function CheckIcon() {
+  return (
+    <span className="inline-grid place-items-center w-5 h-5 rounded-full" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="10" fill="#FFE7D6" />
+        <path d="M6 10.2l2.3 2.3L14 7" stroke="#FF5B04" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </span>
+  )
+}
+
+function ClockIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="white" strokeOpacity="0.9" strokeWidth="2"/>
+      <path d="M12 7v6l4 2" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+function ChatIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M21 12a7 7 0 0 1-7 7H7l-4 3 1.2-4.8A7 7 0 0 1 7 5h7a7 7 0 0 1 7 7Z" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+function ShieldIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3Z" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M9 12l2 2 4-4" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+
+const PROBLEMS = [
+  {
+    title: 'Timing issues',
+    desc: 'Waiting hours on hold during business hours only.',
+    icon: <ClockIcon />
+  },
+  {
+    title: 'Fear of judgement',
+    desc: 'Getting rushed through solutions they don’t understand.',
+    icon: <ChatIcon />
+  },
+  {
+    title: 'Safety worries',
+    desc: 'Worrying about scams asking for passwords or access codes.',
+    icon: <ShieldIcon />
+  },
+]
+
+function SmileIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2"/>
+      <path d="M8 14c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="9" cy="10" r="1" fill="#FF5B04"/><circle cx="15" cy="10" r="1" fill="#FF5B04"/>
+    </svg>
+  )
+}
+function GlobeIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2"/>
+      <path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  )
+}
+function MailIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="6" width="18" height="12" rx="2" stroke="#FF5B04" strokeWidth="2"/>
+      <path d="M5 8l7 5 7-5" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )
+}
+function PhoneIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M6 2h6a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" stroke="#FF5B04" strokeWidth="2"/>
+      <circle cx="9" cy="18" r="1" fill="#FF5B04"/>
+    </svg>
+  )
+}
+function SunIcon(){
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="3.5" stroke="#FF5B04" strokeWidth="2"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  )
+}
+
+const SOLUTION_LEFT = [
+  { title: 'Always patient', desc: 'Never rushed, never judged, always kind.', icon: <SmileIcon/> },
+  { title: 'Speak your language', desc: 'English, Spanish, Chinese — switch anytime.', icon: <GlobeIcon/> },
+  { title: 'Scam-aware', desc: 'We never ask for passwords, OTPs, or personal info.', icon: <ShieldIcon/> },
+]
+
+const SOLUTION_RIGHT = [
+  { title: 'Family-informed', desc: 'You get summaries of what was fixed in email.', icon: <MailIcon/> },
+  { title: 'Available 24/7', desc: 'Help when panic strikes, not just business hours.', icon: <SunIcon/> },
+  { title: 'Phone-first', desc: 'Works on any phone, no apps ever.', icon: <PhoneIcon/> },
+]
 
 const FAQ_ITEMS = [
   {
@@ -349,6 +492,7 @@ const FAQ_ITEMS = [
     a: 'Yes. We follow strict privacy protocols and never share personal information. See our Privacy Policy for full details.'
   },
 ]
+
 function CheckIcon() {
   return (
     <span className="inline-grid place-items-center w-5 h-5 rounded-full" aria-hidden="true">
