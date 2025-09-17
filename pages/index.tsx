@@ -493,14 +493,3 @@ const FAQ_ITEMS = [
   },
 ]
 
-function CheckIcon() {
-  return (
-    <span className="inline-grid place-items-center w-5 h-5 rounded-full" aria-hidden="true">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-        <circle cx="10" cy="10" r="10" fill="#FFE7D6" />
-        <path d="M6 10.2l2.3 2.3L14 7" stroke="#FF5B04" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
-  )
-}
-
