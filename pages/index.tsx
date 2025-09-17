@@ -20,15 +20,17 @@ export default function Home() {
         />
       </Head>
 
-      {/* HERO */}
-      <section className="container mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12 min-h-[80vh]" id="hero">
+      {/* HERO (bottom band now green, image -50px height) */}
+      <section
+        id="hero"
+        className="container mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12 min-h-[80vh]"
+        style={{ background: 'linear-gradient(180deg,#FFFFFF 0%,#FFFFFF 55%,#075056 55%)' }}
+      >
         <div className="text-center">
-          {/* Eyebrow */}
           <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
             Launch offer: Use code LAUNCH40 to get 40% off
           </div>
 
-          {/* H1 */}
           <h1
             className="mx-auto mt-4 font-semibold leading-tight"
             style={{
@@ -41,33 +43,20 @@ export default function Home() {
             On-demand, 24/7 tech help, with the patience your loved ones deserve
           </h1>
 
-          {/* Subcopy */}
           <p className="mx-auto text-slate-600 mt-4 max-w-[650px]">
             Patient tech agents help with any device issue. No judgment, no rushing, no app downloads. Family stays
             informed with automatic summaries.
           </p>
 
-          {/* CTA row */}
           <div className="mt-6 flex justify-center gap-3">
-            <a href="#pricing" className="btn btn-primary">
-              Get 24/7 support now
-            </a>
-            <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">
-              Try a call for free
-            </a>
+            <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
+            <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
           </div>
 
-          {/* Benefit chips */}
           <ul className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-2 text-slate-700">
-            <li className="flex items-center gap-2">
-              <CheckIcon /> <span>No waiting time</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckIcon /> <span>Switch language mid sentence</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <CheckIcon /> <span>Report sent after call</span>
-            </li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>No waiting time</span></li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>Switch language mid sentence</span></li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>Report sent after call</span></li>
           </ul>
         </div>
 
@@ -78,17 +67,14 @@ export default function Home() {
             alt="Patient phone-first help"
             width={1600}
             height={1000}
-            className="w-full max-w-5xl mx-auto h-[520px] md:h-[620px] object-cover rounded-2xl border border-slate-200"
+            className="w-full max-w-5xl mx-auto h-[470px] md:h-[570px] object-cover rounded-2xl border border-slate-200"
             priority
           />
 
           {/* Left card */}
           <div className="hidden md:block absolute left-6 bottom-6">
             <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[240px]">
-              <div
-                className="text-[11px] font-semibold uppercase text-[#FF5B04]"
-                style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}
-              >
+              <div className="text-[11px] font-semibold uppercase text-[#FF5B04]" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
                 Phone first
               </div>
               <div className="mt-1 font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
@@ -101,10 +87,7 @@ export default function Home() {
           {/* Right card */}
           <div className="hidden md:block absolute right-6 bottom-6">
             <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[260px]">
-              <div
-                className="text-[11px] font-semibold uppercase text-[#FF5B04]"
-                style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}
-              >
+              <div className="text-[11px] font-semibold uppercase text-[#FF5B04]" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
                 Scam aware coaching
               </div>
               <div className="mt-1 font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
@@ -116,22 +99,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PROBLEM — center vertically, card redesign */}
+      {/* PROBLEM (centered vertically; cards spaced) */}
       <section id="problem" className="min-h-[80vh] flex items-center" style={{ background: '#075056' }}>
-        <div className="container mx-auto px-4 text-white">
-          <div className="text-center">
-            <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold">The problem</div>
-            <h2
-              className="mt-2 mx-auto font-semibold leading-tight"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
-            >
-              Seniors need help in their specific way, today’s tools were not built for them
-            </h2>
-            <p className="mt-3 max-w-2xl mx-auto opacity-90">
-              Hold music, confusing apps, language barriers and inconsistent advice add stress. Families need patient
-              phone-first help that simply fixes the issue, safely.
-            </p>
-          </div>
+        <div className="container mx-auto px-4 text-white text-center">
+          <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold">The problem</div>
+          <h2
+            className="mt-2 mx-auto font-semibold leading-tight"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
+          >
+            Seniors need help in their specific way, today’s tools were not built for them
+          </h2>
+          <p className="mt-3 max-w-2xl mx-auto opacity-90">
+            Hold music, confusing apps, language barriers and inconsistent advice add stress. Families need patient
+            phone-first help that simply fixes the issue, safely.
+          </p>
 
           <div className="grid md:grid-cols-3 gap-5 mt-10">
             {PROBLEMS.map((card, i) => (
@@ -139,7 +120,7 @@ export default function Home() {
                 key={i}
                 className="group bg-white/10 backdrop-blur rounded-2xl p-6 border border-white/15 hover:scale-[1.03] transition-transform"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 justify-center">
                   <span className="inline-grid place-items-center w-8 h-8 rounded-full bg-white/15 border border-white/20">
                     {card.icon}
                   </span>
@@ -154,13 +135,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SOLUTION — single smooth bg, wider middle image, slimmer cards */}
-      <section id="solution" className="container mx-auto px-4 py-16 min-h-[80vh] bg-[#FFF3E8] rounded-[0]">
+      {/* SOLUTION (no weird container bg; centered; image matches stack height) */}
+      <section id="solution" className="container mx-auto px-4 py-16 min-h-[80vh]">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">Our solution</div>
           <h2
             className="mx-auto font-semibold mt-2"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
           >
             Phone-first tech help designed for seniors
           </h2>
@@ -169,9 +150,9 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 items-start mt-8">
+        <div className="mt-8 grid lg:grid-cols-3 gap-8 items-stretch">
           {/* Left column (slimmer cards) */}
-          <ul className="space-y-3">
+          <ul className="space-y-3 self-stretch">
             {SOLUTION_LEFT.map((t, i) => (
               <li
                 key={i}
@@ -185,24 +166,24 @@ export default function Home() {
                     {t.title}
                   </div>
                 </div>
-                <p className="text-slate-600 mt-2 text-sm">{t.desc}</p>
+                <p className="text-slate-600 mt-8 text-sm">{t.desc}</p>
               </li>
             ))}
           </ul>
 
-          {/* Middle image (44px wider) */}
-          <div className="flex justify-center">
+          {/* Middle image fills column height */}
+          <div className="relative w-full self-stretch min-h-[360px]">
             <Image
               src="/Boroma solution.avif"
               alt="Boroma solution"
-              width={700}
-              height={900}
-              className="rounded-2xl w-full max-w-[464px] border border-slate-200"
+              fill
+              sizes="(min-width: 1024px) 420px, 100vw"
+              className="rounded-2xl border border-slate-200 object-cover"
             />
           </div>
 
           {/* Right column (slimmer cards) */}
-          <ul className="space-y-3">
+          <ul className="space-y-3 self-stretch">
             {SOLUTION_RIGHT.map((t, i) => (
               <li
                 key={i}
@@ -216,32 +197,30 @@ export default function Home() {
                     {t.title}
                   </div>
                 </div>
-                <p className="text-slate-600 mt-2 text-sm">{t.desc}</p>
+                <p className="text-slate-600 mt-8 text-sm">{t.desc}</p>
               </li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* HOW IT WORKS — split left/right */}
+      {/* HOW IT WORKS (split left/right) */}
       <section id="how-it-works" className="container mx-auto px-4 py-16 min-h-[80vh]">
         <div className="grid md:grid-cols-2 gap-8 items-start">
-          {/* Left: label + header + subcopy (left-aligned) */}
           <div>
             <div className="section-label text-[#FF5B04]">How it works</div>
             <h2
               className="mt-2 font-semibold"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
             >
               Three simple steps to peace of mind
             </h2>
             <p className="text-slate-600 mt-3 max-w-[520px]">
-              No apps, no accounts, no passwords. We made it super easy so the next tech call comes to us—not you.
+              No apps, no accounts, no passwords. We made it super easy so the next tech call comes to us, not you.
             </p>
           </div>
 
-          {/* Right: three responsive cards */}
-          <ol className="grid sm:grid-cols-1 gap-4">
+          <ol className="grid gap-4">
             {[
               ['Step 1: Your Parent Calls', 'Just one number to remember: Toll Free number. No apps, no accounts, no passwords.'],
               ['Step 2: Patient Help in Their Language', 'Our agents listen carefully, explain clearly, and work at your parent’s pace.'],
@@ -251,9 +230,7 @@ export default function Home() {
                 <div className="flex items-start gap-3">
                   <span className="w-8 h-8 rounded-full bg-[#FFEDD9] text-[#FF5B04] grid place-content-center font-semibold">{`0${i + 1}`}</span>
                   <div>
-                    <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
-                      {h}
-                    </div>
+                    <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{h}</div>
                     <div className="text-slate-600 mt-1">{d}</div>
                   </div>
                 </div>
@@ -263,16 +240,43 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Scam-Free Pledge (unchanged) */}
+      {/* WHAT WE SOLVE */}
+      <section id="what-we-solve" className="container mx-auto px-4 py-16 min-h-[80vh]">
+        <div className="text-center">
+          <div className="section-label text-[#FF5B04]">What we solve</div>
+          <h2
+            className="mx-auto font-semibold mt-2"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
+          >
+            We cover most everyday issues, here are the popular ones
+          </h2>
+          <p className="text-slate-600 mt-3">Phone, Wi-Fi, passwords, scams, app setup, photos, printers, and more</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-4 mt-8">
+          {POPULAR_ISSUES.map((it, idx) => (
+            <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{it.title}</div>
+              <div className="text-slate-500 text-sm mt-1">{it.meta}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center mt-8">
+          <a href="/what-we-solve" className="btn btn-light">View more</a>
+        </div>
+      </section>
+
+      {/* Scam-Free Pledge (component renders its own gradient; no extra bg here) */}
       <TrustPledge />
 
-      {/* TESTIMONIALS — with images + credentials */}
+      {/* TESTIMONIALS with images */}
       <section id="testimonials" className="container mx-auto px-4 py-16 min-h-[80vh]">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">Testimonials</div>
           <h2
             className="mx-auto font-semibold mt-2"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
           >
             Families who found peace of mind
           </h2>
@@ -300,31 +304,41 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PRICING */}
-      <section id="pricing" className="container mx-auto px-4 py-16 min-h-[80vh]">
+      {/* PRICING (white main card, orange offer card, new toggle copy) */}
+      <section id="pricing" className="container mx-auto px-4 py-16 min-h-[80vh] bg-transparent">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">Pricing</div>
           <h2
             className="mx-auto font-semibold mt-2"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
           >
             Peace of mind for one fixed price
           </h2>
-          <p className="text-slate-600 mt-3 max-w-2xl mx-auto">Cancel anytime. Launch special may apply.</p>
+          <p className="text-slate-600 mt-3">Cancel anytime. Launch special may apply.</p>
         </div>
 
         <div className="mt-8 grid lg:grid-cols-[1fr_380px] gap-8 items-start">
-          {/* Card */}
-          <div className="border rounded-2xl p-6">
-            <div className="flex items-center justify-between">
+          {/* Main pricing card */}
+          <div className="border rounded-2xl p-6 bg-white">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm uppercase text-[#FF5B04] font-semibold">Boroma Plan</div>
                 <div className="text-2xl font-semibold mt-1">{annual ? 'Annual' : 'Monthly'}</div>
               </div>
-              <label className="inline-flex items-center gap-2 text-sm">
-                <span>Bill monthly</span>
-                <input type="checkbox" className="toggle" checked={annual} onChange={(e) => setAnnual(e.target.checked)} />
-                <span>Bill annually</span>
+              <label className="inline-flex items-center gap-3 text-sm select-none">
+                <span>Save 40% with annual plan instead</span>
+                <button
+                  type="button"
+                  onClick={() => setAnnual(a => !a)}
+                  className={`relative w-12 h-6 rounded-full transition ${
+                    annual ? 'bg-[#FF5B04]' : 'bg-slate-300'
+                  }`}
+                  aria-pressed={annual}
+                >
+                  <span
+                    className={`absolute top-0.5 ${annual ? 'right-0.5' : 'left-0.5'} w-5 h-5 rounded-full bg-white transition`}
+                  />
+                </button>
               </label>
             </div>
 
@@ -335,14 +349,14 @@ export default function Home() {
               </div>
 
               <ul className="mt-4 space-y-2 text-slate-700">
-                <li>• 24/7 phone-first tech help</li>
-                <li>• Up to 10 calls/mo, 35 minutes each (25-min reminder)</li>
-                <li>• Toll-free number for paid members</li>
+                <li>• 24/7 phone first tech help</li>
+                <li>• Up to 10 calls per month, 35 minutes each</li>
+                <li>• Toll free number for paid members</li>
                 <li>• Fridge magnet print</li>
                 <li>• Call report after each call</li>
-                <li>• Scam-aware guidance & guardrails</li>
+                <li>• Scam aware guidance and guardrails</li>
                 <li>• Covers common issues on any device</li>
-                <li>• Multilingual — English, Spanish, Chinese</li>
+                <li>• Multilingual: English, Spanish, Chinese</li>
                 <li>• Works on any phone, no apps</li>
                 <li>• Patient, professional agents</li>
               </ul>
@@ -358,25 +372,26 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Side promo */}
-          <aside className="border rounded-2xl p-6">
-            <div className="text-sm uppercase text-[#FF5B04] font-semibold">Launch special — 40% off</div>
-            <div className="mt-2">
-              Use code: <span className="font-semibold">LAUNCH40</span>
+          {/* Offer card */}
+          <aside className="rounded-2xl p-6 bg-[#FF5B04] text-white border border-[#FF5B04]">
+            <div className="text-sm uppercase font-semibold">Launch special — 40% off</div>
+            <div className="mt-2">Use code: <span className="font-semibold">LAUNCH40</span></div>
+            <div className="mt-3">Available for both <strong>MONTHLY</strong> &amp; <strong>ANNUALLY</strong></div>
+            <div className="mt-4 text-xs opacity-90">
+              ⏰ This pricing ends <strong>October 15th, 2025</strong><br />
+              New members after this date pay $29/month or $348/year
             </div>
-            <div className="text-slate-600 mt-1">⏰ This pricing ends October 31st, 2025</div>
-            <div className="text-slate-600 mt-1">New members after October pay $29/month</div>
           </aside>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section id="faq" className="container mx-auto px-4 py-16 min-h-[80vh]">
+      {/* FAQ (solid white bg) */}
+      <section id="faq" className="container mx-auto px-4 py-16 min-h-[80vh] bg-white">
         <div className="text-center">
           <div className="section-label text-[#FF5B04]">FAQ</div>
           <h2
             className="mx-auto font-semibold mt-2"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
           >
             Questions families ask us
           </h2>
@@ -384,7 +399,7 @@ export default function Home() {
 
         <div className="max-w-3xl mx-auto mt-8">
           {FAQ_ITEMS.map((qa, idx) => (
-            <details key={idx} className="border rounded-2xl p-5 mb-3">
+            <details key={idx} className="border rounded-2xl p-5 mb-3 bg-white">
               <summary className="cursor-pointer font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
                 {qa.q}
               </summary>
@@ -393,11 +408,28 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* FINAL CTA */}
+      <section className="container mx-auto px-4 py-16 text-center">
+        <h2
+          className="mx-auto font-semibold"
+          style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '600px' }}
+        >
+          Ready for peaceful tech support?
+        </h2>
+        <p className="text-slate-600 mt-3 max-w-[600px] mx-auto">
+          Get your family covered with patient, phone first help available day and night.
+        </p>
+        <div className="mt-6 flex justify-center gap-3">
+          <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
+          <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
+        </div>
+      </section>
     </>
   )
 }
 
-/* ---------- UI helpers & content ---------- */
+/* ---------- helpers & content ---------- */
 
 function CheckIcon() {
   return (
@@ -424,11 +456,7 @@ function ChatIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <path
         d="M21 12a7 7 0 0 1-7 7H7l-4 3 1.2-4.8A7 7 0 0 1 7 5h7a7 7 0 0 1 7 7Z"
-        stroke="white"
-        strokeOpacity="0.9"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
       />
     </svg>
   )
@@ -454,8 +482,7 @@ function SmileIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2" />
       <path d="M8 14c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="9" cy="10" r="1" fill="#FF5B04" />
-      <circle cx="15" cy="10" r="1" fill="#FF5B04" />
+      <circle cx="9" cy="10" r="1" fill="#FF5B04" /><circle cx="15" cy="10" r="1" fill="#FF5B04" />
     </svg>
   )
 }
@@ -504,15 +531,21 @@ const SOLUTION_RIGHT = [
   { title: 'Phone-first', desc: 'Works on any phone, no apps ever.', icon: <PhoneIcon /> },
 ]
 
+const POPULAR_ISSUES = [
+  { title: 'Wi-Fi Not Connecting', meta: '3 steps • 5–8 min' },
+  { title: 'Phone Storage Full', meta: '4 steps • 6–10 min' },
+  { title: 'Password Reset Basics', meta: '4 steps • 5–7 min' },
+  { title: 'Email Setup & Fix', meta: '3 steps • 6–8 min' },
+  { title: 'WhatsApp / Facebook Login', meta: '3 steps • 5–8 min' },
+  { title: 'OS & App Updates', meta: '3 steps • 4–6 min' },
+  { title: 'Scam / SMS Safety Check', meta: '2 steps • 3–5 min' },
+  { title: 'Contacts/Calendar Sync', meta: '3 steps • 5–8 min' },
+  { title: 'Bluetooth Pairing', meta: '3 steps • 4–6 min' },
+]
+
 const FAQ_ITEMS = [
-  {
-    q: 'Is this real people or AI?',
-    a: "Our tech agents use AI to provide consistent, patient help 24/7. They're trained specifically for senior comfort and safety — no bad days, no rushed calls, no judgment.",
-  },
-  {
-    q: "What if my parent doesn't speak English well?",
-    a: 'Perfect! Our agents speak English, Spanish, and Chinese fluently and can switch languages mid-conversation based on what’s most comfortable.',
-  },
+  { q: 'Is this real people or AI?', a: "Our tech agents use AI to provide consistent, patient help 24/7. They're trained specifically for senior comfort and safety — no bad days, no rushed calls, no judgment." },
+  { q: "What if my parent doesn't speak English well?", a: 'Perfect! Our agents speak English, Spanish, and Chinese fluently and can switch languages mid-conversation based on what’s most comfortable.' },
   { q: 'Will they ask for passwords or access to devices?', a: 'Never. Our Scam-Free Pledge guarantees we never request passwords, OTPs, banking information, or remote access to devices.' },
   { q: "What happens if they can't solve the problem?", a: "We handle 95% of common tech issues. When we can't solve something, we clearly explain why and provide specific next steps or referrals." },
   { q: 'How do I know what happened during the call?', a: 'You receive a detailed text summary within minutes of each call ending, explaining what was discussed and what was resolved.' },
@@ -523,16 +556,13 @@ const FAQ_ITEMS = [
   { q: "Is my parent's information safe?", a: 'Yes. We follow strict privacy protocols and never share personal information. See our Privacy Policy for full details.' },
 ]
 
-/* Testimonial card */
 function Testimonial({ img, name, location, quote }: { img: string; name: string; location: string; quote: string }) {
   return (
     <div className="border rounded-2xl p-5 bg-white">
       <div className="flex items-start gap-4">
         <Image src={img} alt={name} width={48} height={48} className="rounded-full border border-slate-200" />
         <div>
-          <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
-            {name}
-          </div>
+          <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{name}</div>
           <div className="text-sm text-slate-500">{location}</div>
           <p className="text-slate-700 mt-3">{quote}</p>
         </div>
