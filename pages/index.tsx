@@ -137,7 +137,7 @@ export default function Home() {
       </section>
 
       {/* ================= SOLUTION (full-bleed white, centered) ================= */}
-      <section id="solution" className="relative isolate min-h-[80vh]">
+      <section id="solution" className="relative isolate min-h-[70vh]">
         <div className="absolute inset-0 bg-white" />
         <div className="container relative z-10 mx-auto px-4 py-16">
           <div className="text-center">
@@ -298,7 +298,7 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mt-10">
+          <div className="grid md:grid-cols-3 gap-6 mt-10 max-w-6xl mx-auto justify-items-center">
             <Testimonial
               img="/Maria.png"
               name="Maria C."
