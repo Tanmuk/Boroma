@@ -19,10 +19,10 @@ export default function Navbar() {
   return (
     <header className="fixed top-0 inset-x-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200">
       <div className="container mx-auto px-4 h-[64px] flex items-center justify-between">
+        {/* Logo only (no text) */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="inline-flex items-center gap-2">
+          <Link href="/" className="inline-flex items-center gap-2" aria-label="Home">
             <Image src="/Boroma logo.svg" alt="Boroma" width={28} height={28} priority />
-            <span className="font-semibold tracking-tight">Boroma</span>
           </Link>
         </div>
 
@@ -31,9 +31,6 @@ export default function Navbar() {
           <Link href="/what-we-solve">What we solve</Link>
           <a href="/#how-it-works">How it works</a>
           <a href="/#pricing">Pricing</a>
-          <a href="/#faq">FAQ</a>
-          <Link href="/blog">Blog</Link>
-          <Link href="/legal/pledge">Scam-Free Pledge</Link>
         </nav>
 
         {/* Desktop actions */}
@@ -59,7 +56,9 @@ export default function Navbar() {
           onClick={() => setOpen(v => !v)}
           aria-label="Menu"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="#0f172a" strokeWidth="2" strokeLinecap="round"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M4 7h16M4 12h16M4 17h16" stroke="#0f172a" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
         </button>
       </div>
 
@@ -70,9 +69,6 @@ export default function Navbar() {
             <Link href="/what-we-solve" onClick={() => setOpen(false)}>What we solve</Link>
             <a href="/#how-it-works" onClick={() => setOpen(false)}>How it works</a>
             <a href="/#pricing" onClick={() => setOpen(false)}>Pricing</a>
-            <a href="/#faq" onClick={() => setOpen(false)}>FAQ</a>
-            <Link href="/blog" onClick={() => setOpen(false)}>Blog</Link>
-            <Link href="/legal/pledge" onClick={() => setOpen(false)}>Scam-Free Pledge</Link>
           </div>
           <div className="px-4 py-3 grid gap-2">
             {!authed ? (
