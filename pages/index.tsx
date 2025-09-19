@@ -1,14 +1,20 @@
 import Head from 'next/head'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import TrustPledge from '@/components/TrustPledge'
 import { TRIAL_NUMBER } from '@/lib/env.client'
 
 export default function Home() {
   const [annual, setAnnual] = useState(false)
-  const mPrice = 29
-  const yPrice = 348
+
+  // Base prices (no decimals rendered anywhere)
+  const BASE_MONTHLY = 29
+  const BASE_ANNUAL = 348
+  const basePrice = annual ? BASE_ANNUAL : BASE_MONTHLY
+
+  // 40% off computed without decimals
+  const discounted = useMemo(() => Math.round(basePrice * 0.6), [basePrice])
 
   return (
     <>
@@ -18,46 +24,51 @@ export default function Home() {
           name="description"
           content="On-demand, 24/7 tech help with the patience your loved ones deserve. English, Spanish, Chinese. Toll-free line for members. Family gets summaries after each call."
         />
+        <link rel="canonical" href="https://boroma.site/" />
+        <meta property="og:title" content="Boroma — Patient 24/7 phone-first tech help for seniors" />
+        <meta
+          property="og:description"
+          content="On-demand, 24/7 tech help with the patience your loved ones deserve. English, Spanish, Chinese."
+        />
+        <meta property="og:url" content="https://boroma.site/" />
+        <meta property="og:type" content="website" />
       </Head>
 
-      {/* ================= HERO (full-bleed, green band) ================= */}
-      <section id="hero" className="relative isolate min-h-[80vh]">
+      {/* ================= HERO ================= */}
+      <section id="hero" className="relative isolate">
         {/* green band at bottom */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[240px] bg-[#075056]" />
-        <div className="container relative z-10 mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12">
-          <div className="text-center">
-            <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
-              Launch offer: Use code LAUNCH40 to get 40% off
-            </div>
-
-            <h1
-              className="mx-auto mt-4 font-semibold leading-tight"
-              style={{
-                fontFamily: 'Mona Sans, ui-sans-serif, system-ui',
-                fontWeight: 600,
-                fontSize: '60px',
-                maxWidth: 'none',
-              }}
-            >
-              On-demand, 24/7 tech help, with the patience your loved ones deserve
-            </h1>
-
-            <p className="mx-auto text-slate-600 mt-4 max-w-[650px]">
-              Patient tech agents help with any device issue. No judgment, no rushing, no app downloads. Family stays
-              informed with automatic summaries.
-            </p>
-
-            <div className="mt-6 flex justify-center gap-3">
-              <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
-              <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
-            </div>
-
-            <ul className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-2 text-slate-700">
-              <li className="flex items-center gap-2"><CheckIcon /> <span>No waiting time</span></li>
-              <li className="flex items-center gap-2"><CheckIcon /> <span>Switch language mid sentence</span></li>
-              <li className="flex items-center gap-2"><CheckIcon /> <span>Report sent after call</span></li>
-            </ul>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[220px] bg-[#075056]" />
+        <div className="container relative z-10 mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12 text-center">
+          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
+            Launch offer: Use code LAUNCH40 to get 40% off
           </div>
+
+          <h1
+            className="mx-auto mt-4 font-semibold leading-tight"
+            style={{
+              fontFamily: 'Mona Sans, ui-sans-serif, system-ui',
+              fontWeight: 600,
+              fontSize: '60px',
+            }}
+          >
+            On-demand, 24/7 tech help, with the patience your loved ones deserve
+          </h1>
+
+          <p className="mx-auto text-slate-600 mt-4 max-w-[650px]">
+            Patient tech agents help with any device issue. No judgment, no rushing, no app downloads. Family stays
+            informed with automatic summaries.
+          </p>
+
+          <div className="mt-6 flex justify-center gap-3">
+            <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
+            <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
+          </div>
+
+          <ul className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-2 text-slate-700">
+            <li className="flex items-center gap-2"><CheckIcon /> <span>No waiting time</span></li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>Switch language mid sentence</span></li>
+            <li className="flex items-center gap-2"><CheckIcon /> <span>Report sent after call</span></li>
+          </ul>
 
           {/* image + overlay cards */}
           <div className="mt-10 relative">
@@ -66,13 +77,13 @@ export default function Home() {
               alt="Patient phone-first help"
               width={1600}
               height={1000}
-              className="w-full max-w-5xl mx-auto h-[470px] md:h-[570px] object-cover rounded-2xl border border-slate-200"
+              className="w-full max-w-5xl mx-auto h-[450px] md:h-[550px] object-cover rounded-2xl border border-slate-200"
               priority
             />
 
             {/* Left card */}
             <div className="hidden md:block absolute left-6 bottom-6">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[240px]">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[240px] text-left">
                 <div className="text-[11px] font-semibold uppercase text-[#FF5B04]" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
                   Phone first
                 </div>
@@ -85,7 +96,7 @@ export default function Home() {
 
             {/* Right card */}
             <div className="hidden md:block absolute right-6 bottom-6">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[260px]">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[260px] text-left">
                 <div className="text-[11px] font-semibold uppercase text-[#FF5B04]" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
                   Scam aware coaching
                 </div>
@@ -99,14 +110,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= PROBLEM (full-bleed teal) ================= */}
-      <section id="problem" className="relative isolate min-h-[80vh]">
+      {/* ================= PROBLEM (green) ================= */}
+      <section id="problem" className="relative isolate">
         <div className="absolute inset-0 bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 py-16 text-white text-center">
           <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold">The problem</div>
           <h2
-            className="mt-2 mx-auto font-semibold leading-tight"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+            className="mt-2 mx-auto font-semibold leading-tight max-w-[700px]"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
           >
             Seniors need help in their specific way, today’s tools were not built for them
           </h2>
@@ -136,15 +147,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= SOLUTION (full-bleed white, centered) ================= */}
-      <section id="solution" className="relative isolate min-h-[70vh]">
+      {/* ================= SOLUTION ================= */}
+      <section id="solution" className="relative isolate">
         <div className="absolute inset-0 bg-white" />
-        <div className="container relative z-10 mx-auto px-4 py-16">
-          <div className="text-center">
+        <div className="container relative z-10 mx-auto px-4 py-16 text-center">
+          <div>
             <div className="section-label text-[#FF5B04]">Our solution</div>
             <h2
-              className="mx-auto font-semibold mt-2"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+              className="mx-auto font-semibold mt-2 max-w-[700px]"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
             >
               Phone-first tech help designed for seniors
             </h2>
@@ -155,7 +166,7 @@ export default function Home() {
 
           <div className="mt-8 grid lg:grid-cols-3 gap-8 items-stretch">
             {/* Left column */}
-            <ul className="space-y-3 self-stretch">
+            <ul className="space-y-3 self-stretch text-left">
               {SOLUTION_LEFT.map((t, i) => (
                 <li
                   key={i}
@@ -186,7 +197,7 @@ export default function Home() {
             </div>
 
             {/* Right column */}
-            <ul className="space-y-3 self-stretch">
+            <ul className="space-y-3 self-stretch text-left">
               {SOLUTION_RIGHT.map((t, i) => (
                 <li
                   key={i}
@@ -208,27 +219,27 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= HOW IT WORKS (split left/right) ================= */}
-      <section id="how-it-works" className="relative isolate min-h-[80vh]">
+      {/* ================= HOW IT WORKS ================= */}
+      <section id="how-it-works" className="relative isolate">
         <div className="absolute inset-0 bg-white" />
         <div className="container relative z-10 mx-auto px-4 py-16">
-          <div className="grid md:grid-cols-2 gap-8 items-start">
-            <div>
+          <div className="grid md:grid-cols-2 gap-8 items-center justify-items-center">
+            <div className="text-center md:text-left">
               <div className="section-label text-[#FF5B04]">How it works</div>
               <h2
-                className="mt-2 font-semibold"
-                style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+                className="mt-2 font-semibold max-w-[700px]"
+                style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
               >
                 Three simple steps to peace of mind
               </h2>
-              <p className="text-slate-600 mt-3 max-w-[520px]">
+              <p className="text-slate-600 mt-3 max-w-[520px] mx-auto md:mx-0">
                 No apps, no accounts, no passwords. We made it super easy so the next tech call comes to us, not you.
               </p>
             </div>
 
-            <ol className="grid gap-4">
+            <ol className="grid gap-4 w-full max-w-[560px]">
               {[
-                ['Step 1: Your Parent Calls', 'Just one number to remember: Toll Free number. No apps, no accounts, no passwords.'],
+                ['Step 1: Your Parent Calls', 'Just one TOLL FREEE number to remember:  No apps, no accounts, no passwords.'],
                 ['Step 2: Patient Help in Their Language', 'Our agents listen carefully, explain clearly, and work at your parent’s pace.'],
                 ['Step 3: You Stay Informed', 'Get a text summary of what happened, what was fixed, and any follow-up needed.'],
               ].map(([h, d], i) => (
@@ -248,23 +259,23 @@ export default function Home() {
       </section>
 
       {/* ================= WHAT WE SOLVE ================= */}
-      <section id="what-we-solve" className="relative isolate min-h-[80vh]">
+      <section id="what-we-solve" className="relative isolate">
         <div className="absolute inset-0 bg-[#FFF6EB]" />
-        <div className="container relative z-10 mx-auto px-4 py-16">
-          <div className="text-center">
+        <div className="container relative z-10 mx-auto px-4 py-16 text-center">
+          <div>
             <div className="section-label text-[#FF5B04]">What we solve</div>
             <h2
-              className="mx-auto font-semibold mt-2"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+              className="mx-auto font-semibold mt-2 max-w-[700px]"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
             >
               We cover most everyday issues, here are the popular ones
             </h2>
             <p className="text-slate-600 mt-3">Phone, Wi-Fi, passwords, scams, app setup, photos, printers, and more</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4 mt-8">
+          <div className="grid md:grid-cols-3 gap-4 mt-8 max-w-6xl mx-auto">
             {POPULAR_ISSUES.map((it, idx) => (
-              <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 text-left">
                 <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{it.title}</div>
                 <div className="text-slate-500 text-sm mt-1">{it.meta}</div>
               </div>
@@ -277,22 +288,23 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= SCAM-FREE PLEDGE (component owns its gradient) ================= */}
+      {/* ================= SCAM-FREE PLEDGE (green background per request) ================= */}
       <section className="relative isolate">
-        <div className="container relative z-10 mx-auto px-4">
+        <div className="absolute inset-0 bg-[#075056]" />
+        <div className="container relative z-10 mx-auto px-4 py-16">
           <TrustPledge />
         </div>
       </section>
 
       {/* ================= TESTIMONIALS ================= */}
-      <section id="testimonials" className="relative isolate min-h-[80vh]">
+      <section id="testimonials" className="relative isolate">
         <div className="absolute inset-0 bg-white" />
-        <div className="container relative z-10 mx-auto px-4 py-16">
-          <div className="text-center">
+        <div className="container relative z-10 mx-auto px-4 py-16 text-center">
+          <div>
             <div className="section-label text-[#FF5B04]">Testimonials</div>
             <h2
-              className="mx-auto font-semibold mt-2"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+              className="mx-auto font-semibold mt-2 max-w-[700px]"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
             >
               Families who found peace of mind
             </h2>
@@ -322,23 +334,23 @@ export default function Home() {
       </section>
 
       {/* ================= PRICING ================= */}
-      <section id="pricing" className="relative isolate min-h-[80vh]">
-        <div className="absolute inset-0 bg-[#FFF3E8]" />
-        <div className="container relative z-10 mx-auto px-4 py-16">
-          <div className="text-center">
-            <div className="section-label text-[#FF5B04]">Pricing</div>
+      <section id="pricing" className="relative isolate">
+        <div className="absolute inset-0 bg-[#075056]" />
+        <div className="container relative z-10 mx-auto px-4 py-16 text-center text-white">
+          <div>
+            <div className="section-label text-[#FFEDD9]">Pricing</div>
             <h2
-              className="mx-auto font-semibold mt-2"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+              className="mx-auto font-semibold mt-2 max-w-[700px]"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
             >
               Peace of mind for one fixed price
             </h2>
-            <p className="text-slate-600 mt-3">Cancel anytime. Launch special may apply.</p>
+            <p className="opacity-90 mt-3">Cancel anytime. Launch special may apply.</p>
           </div>
 
-          <div className="mt-8 grid lg:grid-cols-[1fr_380px] gap-8 items-start">
+          <div className="mt-8 grid lg:grid-cols-[1fr_420px] gap-8 items-start text-left">
             {/* Main pricing card */}
-            <div className="border rounded-2xl p-6 bg-white">
+            <div className="border rounded-2xl p-6 bg-white text-slate-900">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm uppercase text-[#FF5B04] font-semibold">Boroma Plan</div>
@@ -349,77 +361,85 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setAnnual(a => !a)}
-                    className={`relative w-12 h-6 rounded-full transition ${
-                      annual ? 'bg-[#FF5B04]' : 'bg-slate-300'
-                    }`}
+                    className={`relative w-12 h-6 rounded-full transition ${annual ? 'bg-[#FF5B04]' : 'bg-slate-300'}`}
                     aria-pressed={annual}
                   >
-                    <span
-                      className={`absolute top-0.5 ${annual ? 'right-0.5' : 'left-0.5'} w-5 h-5 rounded-full bg-white transition`}
-                    />
+                    <span className={`absolute top-0.5 ${annual ? 'right-0.5' : 'left-0.5'} w-5 h-5 rounded-full bg-white transition`} />
                   </button>
                 </label>
               </div>
 
-              <div className="mt-4">
-                <div className="text-4xl font-semibold">
-                  ${annual ? yPrice : mPrice}
-                  <span className="text-base font-normal text-slate-500">/{annual ? 'yr' : 'mo'}</span>
-                </div>
+              {/* Price row with strike-through base and discounted bold */}
+              <div className="mt-4 flex items-baseline gap-4">
+                <div className="text-3xl line-through text-slate-400">${basePrice}</div>
+                <div className="text-5xl font-semibold text-slate-900">${discounted}</div>
+                <div className="text-base text-slate-500">/{annual ? 'yr' : 'mo'}</div>
+              </div>
 
-                <ul className="mt-4 space-y-2 text-slate-700">
-                  <li>• 24/7 phone first tech help</li>
-                  <li>• Up to 10 calls per month, 35 minutes each</li>
-                  <li>• Toll free number for paid members</li>
-                  <li>• Fridge magnet print</li>
-                  <li>• Call report after each call</li>
-                  <li>• Scam aware guidance and guardrails</li>
-                  <li>• Covers common issues on any device</li>
-                  <li>• Multilingual: English, Spanish, Chinese</li>
-                  <li>• Works on any phone, no apps</li>
-                  <li>• Patient, professional agents</li>
-                </ul>
+              <ul className="mt-4 space-y-2 text-slate-700">
+                <li>• 24/7 phone first tech help</li>
+                <li>• Up to 10 calls per month, 35 minutes each</li>
+                <li>• Toll free number for paid members</li>
+                <li>• Fridge magnet print</li>
+                <li>• Call report after each call</li>
+                <li>• Scam aware guidance and guardrails</li>
+                <li>• Covers common issues on any device</li>
+                <li>• Multilingual: English, Spanish, Chinese</li>
+                <li>• Works on any phone, no apps</li>
+              </ul>
 
-                <div className="mt-6 flex gap-3">
-                  <Link href={`/signup?plan=${annual ? 'annual' : 'monthly'}`} className="btn btn-primary">
-                    Get 24/7 support now
-                  </Link>
-                  <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">
-                    Try a call for free
-                  </a>
-                </div>
+              <div className="mt-6 flex gap-3">
+                <Link href={`/signup?plan=${annual ? 'annual' : 'monthly'}`} className="btn btn-primary">
+                  Get 24/7 support now
+                </Link>
+                <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">
+                  Try a call for free
+                </a>
               </div>
             </div>
 
-            {/* Offer card */}
-            <aside className="rounded-2xl p-6 bg-[#FF5B04] text-white border border-[#FF5B04]">
-              <div className="text-sm uppercase font-semibold">Launch special — 40% off</div>
-              <div className="mt-2">Use code: <span className="font-semibold">LAUNCH40</span></div>
-              <div className="mt-3">Available for both <strong>MONTHLY</strong> &amp; <strong>ANNUALLY</strong></div>
-              <div className="mt-4 text-xs opacity-90">
-                ⏰ This pricing ends <strong>October 15th, 2025</strong><br />
-                New members after this date pay $29/month or $348/year
+            {/* Offer card — redesigned with animated border and code pill */}
+            <aside className="offer-animate rounded-3xl p-[2px]">
+              <div className="rounded-3xl p-6 bg-[#FF5B04] text-white relative overflow-hidden">
+                <div className="text-sm uppercase font-semibold tracking-wide">Launch special — 40% off</div>
+
+                <div className="mt-3">
+                  <span className="text-sm">Use code:</span>{' '}
+                  <span className="inline-block bg-white text-[#FF5B04] font-semibold px-2.5 py-1 rounded-md shadow-sm">
+                    LAUNCH40
+                  </span>
+                </div>
+
+                <div className="mt-3">Available for both <strong>MONTHLY</strong> &amp; <strong>ANNUALLY</strong></div>
+
+                <div className="mt-5 text-xs opacity-90 leading-relaxed">
+                  ⏰ This pricing ends <strong>October 15th, 2025</strong><br />
+                  New members after this date pay $29/month or $348/year
+                </div>
+
+                {/* subtle corner flare */}
+                <div className="pointer-events-none absolute -top-10 -right-10 w-28 h-28 rounded-full bg-white/15 blur-2xl" />
               </div>
             </aside>
           </div>
         </div>
       </section>
 
-      {/* ================= FAQ (solid white) ================= */}
-      <section id="faq" className="relative isolate min-h-[80vh]">
+      {/* ================= FAQ ================= */}
+      <section id="faq" className="relative isolate">
         <div className="absolute inset-0 bg-white" />
-        <div className="container relative z-10 mx-auto px-4 py-16">
-          <div className="text-center">
+        <div className="container relative z-10 mx-auto px-4 py-16 text-center">
+          <div>
             <div className="section-label text-[#FF5B04]">FAQ</div>
             <h2
-              className="mx-auto font-semibold mt-2"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+              className="mx-auto font-semibold mt-2 max-w-[700px]"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
             >
               Questions families ask us
             </h2>
           </div>
 
-          <div className="max-w-3xl mx-auto mt-8">
+          <div className="max-w-3xl mx-auto mt-8 text-left">
             {FAQ_ITEMS.map((qa, idx) => (
               <details key={idx} className="border rounded-2xl p-5 mb-3 bg-white">
                 <summary className="cursor-pointer font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
@@ -437,8 +457,8 @@ export default function Home() {
         <div className="absolute inset-0 bg-[#FFF6EB]" />
         <div className="container relative z-10 mx-auto px-4 py-16 text-center">
           <h2
-            className="mx-auto font-semibold"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px', maxWidth: '700px' }}
+            className="mx-auto font-semibold max-w-[700px]"
+            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
           >
             Ready for peaceful tech support?
           </h2>
@@ -451,6 +471,19 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* animated gradient border for the orange offer card */}
+      <style jsx global>{`
+        .offer-animate {
+          background: linear-gradient(90deg, #ff7a1a, #ffc078, #ff7a1a);
+          background-size: 200% 100%;
+          animation: borderMove 3s linear infinite;
+        }
+        @keyframes borderMove {
+          0% { background-position: 0% 0%; }
+          100% { background-position: 200% 0%; }
+        }
+      `}</style>
     </>
   )
 }
@@ -584,7 +617,7 @@ const FAQ_ITEMS = [
 
 function Testimonial({ img, name, location, quote }: { img: string; name: string; location: string; quote: string }) {
   return (
-    <div className="border rounded-2xl p-5 bg-white">
+    <div className="border rounded-2xl p-5 bg-white max-w-[480px] w-full text-left">
       <div className="flex items-start gap-4">
         <Image src={img} alt={name} width={48} height={48} className="rounded-full border border-slate-200" />
         <div>
