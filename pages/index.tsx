@@ -2,12 +2,15 @@ import Head from 'next/head'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
+
 import TrustPledge from '@/components/TrustPledge'
 import { TRIAL_NUMBER } from '@/lib/env.client'
-import { phCapture } from '@/lib/posthog'
+import { phCapture, identifyProspect } from '@/lib/posthog'
 
 export default function Home() {
   const [annual, setAnnual] = useState(false)
+
+  // pricing math (no decimals, strike-through base, show 40% off)
   const BASE_MONTHLY = 29
   const BASE_ANNUAL = 348
   const basePrice = annual ? BASE_ANNUAL : BASE_MONTHLY
@@ -26,8 +29,11 @@ export default function Home() {
         <meta property="og:description" content="On-demand, 24/7 tech help with the patience your loved ones deserve." />
         <meta property="og:url" content="https://boroma.site/" />
         <meta property="og:type" content="website" />
+        {/* SEO: Organization + support contact (toll-free visible for SEO) */}
         <script
           type="application/ld+json"
+          // NOTE: we do not surface the toll-free number in public CTAs outside the dashboard;
+          // using it here only for SEO contact metadata is okay.
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
@@ -40,17 +46,17 @@ export default function Home() {
                   telephone: '+1-877-766-6307',
                   contactType: 'customer support',
                   areaServed: 'US',
-                  availableLanguage: ['English', 'Spanish', 'Chinese'],
-                },
-              ],
-            }),
+                  availableLanguage: ['English', 'Spanish', 'Chinese']
+                }
+              ]
+            })
           }}
         />
       </Head>
 
       {/* ================= HERO ================= */}
       <section id="hero" className="relative isolate">
-        {/* green band at bottom */}
+        {/* green band at bottom for hero framing */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[220px] bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 pt-[12vh] md:pt-[14vh] pb-12 text-center">
           <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
@@ -61,8 +67,7 @@ export default function Home() {
             className="mx-auto mt-4 font-semibold leading-tight"
             style={{
               fontFamily: 'Mona Sans, ui-sans-serif, system-ui',
-              // Mobile-safe sizing using clamp for responsiveness
-              fontSize: 'clamp(34px, 6vw, 60px)',
+              fontSize: 'clamp(34px, 6vw, 60px)'
             }}
           >
             On-demand, 24/7 tech help, with the patience your loved ones deserve
@@ -74,8 +79,27 @@ export default function Home() {
           </p>
 
           <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
-            <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
-            <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
+            <a
+              href="#pricing"
+              className="btn btn-primary"
+              onClick={() => {
+                identifyProspect({ interest: 'hero_primary' })
+                phCapture('hero_primary_click')
+              }}
+            >
+              Get 24/7 support now
+            </a>
+
+            <a
+              href={`tel:${TRIAL_NUMBER}`}
+              className="btn btn-outline"
+              onClick={() => {
+                identifyProspect()
+                phCapture('hero_try_free_call')
+              }}
+            >
+              Try a call for free
+            </a>
           </div>
 
           <ul className="mt-6 flex flex-wrap justify-center gap-x-8 gap-y-2 text-slate-700">
@@ -84,7 +108,7 @@ export default function Home() {
             <li className="flex items-center gap-2"><CheckIcon /> <span>Report sent after call</span></li>
           </ul>
 
-          {/* image + overlay cards */}
+          {/* hero image + overlay cards */}
           <div className="mt-10 relative">
             <Image
               src="/hero.avif"
@@ -233,7 +257,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= HOW IT WORKS (min 80vh + centered) ================= */}
+      {/* ================= HOW IT WORKS (≥80vh, centered) ================= */}
       <section id="how-it-works" className="relative isolate min-h-[80vh] grid content-center">
         <div className="absolute inset-0 bg-white" />
         <div className="container relative z-10 mx-auto px-4 py-16">
@@ -297,28 +321,30 @@ export default function Home() {
           </div>
 
           <div className="text-center mt-8">
-            <a href="/what-we-solve" className="btn btn-light">View more</a>
+            <a
+              href="/what-we-solve"
+              className="btn btn-light"
+              onClick={() => {
+                identifyProspect({ interest: 'what_we_solve' })
+                phCapture('what_we_solve_view_more')
+              }}
+            >
+              View more
+            </a>
           </div>
         </div>
       </section>
 
-      {/* ================= SCAM-FREE PLEDGE (green) — stronger contrast heading ================= */}
+      {/* ================= SCAM-FREE PLEDGE (green) — single heading, high contrast ================= */}
       <section className="relative isolate">
         <div className="absolute inset-0 bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 py-16">
-          <div className="text-center">
-            <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold"></div>
-            <h2
-              className="mt-2 font-semibold text-white"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
-            >
-            </h2>
-          </div>
+          {/* TrustPledge renders its own H2; no duplicate heading here */}
           <TrustPledge />
         </div>
       </section>
 
-      {/* ================= TESTIMONIALS (min 80vh + centered) ================= */}
+      {/* ================= TESTIMONIALS (≥80vh, centered) ================= */}
       <section id="testimonials" className="relative isolate min-h-[80vh] grid content-center">
         <div className="absolute inset-0 bg-white" />
         <div className="container relative z-10 mx-auto px-4 py-16 text-center">
@@ -355,7 +381,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= PRICING ================= */}
+      {/* ================= PRICING (green background) ================= */}
       <section id="pricing" className="relative isolate">
         <div className="absolute inset-0 bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 py-16 text-center text-white">
@@ -378,6 +404,7 @@ export default function Home() {
                   <div className="text-sm uppercase text-[#FF5B04] font-semibold">Boroma Plan</div>
                   <div className="text-2xl font-semibold mt-1">{annual ? 'Annual' : 'Monthly'}</div>
                 </div>
+
                 <label className="inline-flex items-center gap-3 text-sm select-none">
                   <span>Save 40% with annual plan instead</span>
                   <button
@@ -411,16 +438,31 @@ export default function Home() {
               </ul>
 
               <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                <Link href={`/signup?plan=${annual ? 'annual' : 'monthly'}`} className="btn btn-primary">
+                <Link
+                  href={`/signup?plan=${annual ? 'annual' : 'monthly'}`}
+                  className="btn btn-primary"
+                  onClick={() => {
+                    identifyProspect({ interest: 'pricing_cta', plan_intent: annual ? 'annual' : 'monthly' })
+                    phCapture('pricing_primary_click', { plan_intent: annual ? 'annual' : 'monthly' })
+                  }}
+                >
                   Get 24/7 support now
                 </Link>
-                <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">
+
+                <a
+                  href={`tel:${TRIAL_NUMBER}`}
+                  className="btn btn-outline"
+                  onClick={() => {
+                    identifyProspect({ interest: 'pricing_try_call' })
+                    phCapture('pricing_try_free_call')
+                  }}
+                >
                   Try a call for free
                 </a>
               </div>
             </div>
 
-            {/* Offer card — redesigned with animated border and code pill */}
+            {/* Offer card — animated border + code pill */}
             <aside className="offer-animate rounded-3xl p-[2px]">
               <div className="rounded-3xl p-6 bg-[#FF5B04] text-white relative overflow-hidden">
                 <div className="text-sm uppercase font-semibold tracking-wide">Launch special — 40% off</div>
@@ -438,187 +480,84 @@ export default function Home() {
                   ⏰ This pricing ends <strong>October 15th, 2025</strong><br />
                   New members after this date pay $29/month or $348/year
                 </div>
-
-                {/* subtle corner flare */}
-                <div className="pointer-events-none absolute -top-10 -right-10 w-28 h-28 rounded-full bg-white/15 blur-2xl" />
               </div>
             </aside>
           </div>
         </div>
       </section>
-
-      {/* ================= FAQ ================= */}
-      <section id="faq" className="relative isolate">
-        <div className="absolute inset-0 bg-white" />
-        <div className="container relative z-10 mx-auto px-4 py-16 text-center">
-          <div>
-            <div className="section-label text-[#FF5B04]">FAQ</div>
-            <h2
-              className="mx-auto font-semibold mt-2 max-w-[700px]"
-              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
-            >
-              Questions families ask us
-            </h2>
-          </div>
-
-          <div className="max-w-3xl mx-auto mt-8 text-left">
-            {FAQ_ITEMS.map((qa, idx) => (
-              <details key={idx} className="border rounded-2xl p-5 mb-3 bg-white">
-                <summary className="cursor-pointer font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
-                  {qa.q}
-                </summary>
-                <p className="text-slate-600 mt-2">{qa.a}</p>
-              </details>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================= FINAL CTA ================= */}
-      <section className="relative isolate">
-        <div className="absolute inset-0 bg-[#FFF6EB]" />
-        <div className="container relative z-10 mx-auto px-4 py-16 text-center">
-          <h2
-            className="mx-auto font-semibold max-w-[700px]"
-            style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
-          >
-            Ready for peaceful tech support?
-          </h2>
-          <p className="text-slate-600 mt-3 max-w-[700px] mx-auto">
-            Get your family covered with patient, phone first help available day and night.
-          </p>
-          <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
-            <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
-            <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
-          </div>
-        </div>
-      </section>
-
-      {/* animated gradient border for the orange offer card */}
-      <style jsx global>{`
-        .offer-animate {
-          background: linear-gradient(90deg, #ff7a1a, #ffc078, #ff7a1a);
-          background-size: 200% 100%;
-          animation: borderMove 3s linear infinite;
-        }
-        @keyframes borderMove {
-          0% { background-position: 0% 0%; }
-          100% { background-position: 200% 0%; }
-        }
-      `}</style>
     </>
   )
 }
 
-/* ---------- helpers & content ---------- */
+/* ---------- Local UI bits (icons/cards/data) ---------- */
 
 function CheckIcon() {
   return (
     <span className="inline-grid place-items-center w-5 h-5 rounded-full" aria-hidden="true">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
         <circle cx="10" cy="10" r="10" fill="#FFE7D6" />
-        <path d="M6 10.2l2.3 2.3L14 7" stroke="#FF5B04" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 10.2l2.3 2.3L14 7" stroke="#FF5B04" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     </span>
   )
 }
 
-/* Problem icons (white for green background) */
-function ClockIcon() {
+function OutlineIcon() {
+  // base icon (stroke is orange for the "scam-aware" to match the rest)
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="9" stroke="white" strokeOpacity="0.9" strokeWidth="2" />
-      <path d="M12 7v6l4 2" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2" />
+      <path d="M8 12l2 2 5-5" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
-function ChatIcon() {
+
+function TimeIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path
-        d="M21 12a7 7 0 0 1-7 7H7l-4 3 1.2-4.8A7 7 0 0 1 7 5h7a7 7 0 0 1 7 7Z"
-        stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2" />
+      <path d="M12 7v6l4 2" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" />
     </svg>
   )
 }
-function ShieldIconWhite() {
+
+function ShieldIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3Z" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M9 12l2 2 4-4" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z" stroke="#FF5B04" strokeWidth="2" fill="none"/>
+      <path d="M9 12l2 2 4-4" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   )
 }
 
 const PROBLEMS = [
-  { title: 'Timing issues', desc: 'Waiting hours on hold during business hours only.', icon: <ClockIcon /> },
-  { title: 'Fear of judgement', desc: 'Getting rushed through solutions they don’t understand.', icon: <ChatIcon /> },
-  { title: 'Safety worries', desc: 'Worrying about scams asking for passwords or access codes.', icon: <ShieldIconWhite /> },
+  {
+    title: 'Timing issues',
+    desc: 'Waiting hours on hold during business hours only',
+    icon: <TimeIcon />
+  },
+  {
+    title: 'Fear of judgement',
+    desc: 'Getting rushed through solutions they don’t understand',
+    icon: <OutlineIcon />
+  },
+  {
+    title: 'Safety worries',
+    desc: 'Worrying about scams asking for passwords or access code',
+    icon: <ShieldIcon />
+  }
 ]
 
-/* Solution icons (all orange — fixed Scam-aware to match) */
-function SmileIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2" />
-      <path d="M8 14c1.2 1 2.6 1.5 4 1.5s2.8-.5 4-1.5" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" />
-      <circle cx="9" cy="10" r="1" fill="#FF5B04" /><circle cx="15" cy="10" r="1" fill="#FF5B04" />
-    </svg>
-  )
-}
-function GlobeIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2" />
-      <path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-function ShieldIconOrange() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3Z" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M9 12l2 2 4-4" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-function MailIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="6" width="18" height="12" rx="2" stroke="#FF5B04" strokeWidth="2" />
-      <path d="M5 8l7 5 7-5" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-function PhoneIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <path d="M6 2h6a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Z" stroke="#FF5B04" strokeWidth="2" />
-      <circle cx="9" cy="18" r="1" fill="#FF5B04" />
-    </svg>
-  )
-}
-function SunIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="3.5" stroke="#FF5B04" strokeWidth="2" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 const SOLUTION_LEFT = [
-  { title: 'Always patient', desc: 'Never rushed, never judged, always kind.', icon: <SmileIcon /> },
-  { title: 'Speak your language', desc: 'English, Spanish, Chinese — switch anytime.', icon: <GlobeIcon /> },
-  // FIXED: orange shield like others
-  { title: 'Scam-aware', desc: 'We never ask for passwords, OTPs, or personal info.', icon: <ShieldIconOrange /> },
+  { title: 'Always patient', desc: 'Never rushed, never judged, always kind', icon: <OutlineIcon /> },
+  { title: 'Speak your language', desc: 'English, Spanish, Chinese — switch anytime', icon: <OutlineIcon /> },
+  { title: 'Scam-aware', desc: 'Never ask for passwords, OTPs, or personal info', icon: <ShieldIcon /> }
 ]
 
 const SOLUTION_RIGHT = [
-  { title: 'Family-informed', desc: 'You get summaries of what was fixed in email.', icon: <MailIcon /> },
-  { title: 'Available 24/7', desc: 'Help when panic strikes, not just business hours.', icon: <SunIcon /> },
-  { title: 'Phone-first', desc: 'Works on any phone, no apps ever.', icon: <PhoneIcon /> },
+  { title: 'Family-informed', desc: 'You get summaries of what was fixed in email', icon: <OutlineIcon /> },
+  { title: 'Available 24/7', desc: 'Help when panic strikes, not just business hours', icon: <TimeIcon /> },
+  { title: 'Phone-first', desc: 'Works on any phone, no apps ever', icon: <OutlineIcon /> }
 ]
 
 const POPULAR_ISSUES = [
@@ -630,33 +569,30 @@ const POPULAR_ISSUES = [
   { title: 'OS & App Updates', meta: '3 steps • 4–6 min' },
   { title: 'Scam / SMS Safety Check', meta: '2 steps • 3–5 min' },
   { title: 'Contacts/Calendar Sync', meta: '3 steps • 5–8 min' },
-  { title: 'Bluetooth Pairing', meta: '3 steps • 4–6 min' },
+  { title: 'Bluetooth Pairing', meta: '3 steps • 4–6 min' }
 ]
 
-const FAQ_ITEMS = [
-  { q: 'Is this real people or AI?', a: "Our tech agents use AI to provide consistent, patient help 24/7. They're trained specifically for senior comfort and safety — no bad days, no rushed calls, no judgment." },
-  { q: "What if my parent doesn't speak English well?", a: 'Perfect! Our agents speak English, Spanish, and Chinese fluently and can switch languages mid-conversation based on what’s most comfortable.' },
-  { q: 'Will they ask for passwords or access to devices?', a: 'Never. Our Scam-Free Pledge guarantees we never request passwords, OTPs, banking information, or remote access to devices.' },
-  { q: "What happens if they can't solve the problem?", a: "We handle 95% of common tech issues. When we can't solve something, we clearly explain why and provide specific next steps or referrals." },
-  { q: 'How do I know what happened during the call?', a: 'You receive a detailed text summary within minutes of each call ending, explaining what was discussed and what was resolved.' },
-  { q: 'Can I get recordings of the calls?', a: 'Yes, all calls are recorded up to 30 days and available upon request for quality and safety purposes.' },
-  { q: "What's the difference between the free trial and paid service?", a: 'Free trial is one call per phone number with a time limit. Paid members get our dedicated toll-free line with 10 calls monthly, 35 minutes each.' },
-  { q: 'How quickly can someone answer?', a: 'Typically under 2 minutes, 24/7. No hold music, no phone trees, just patient help.' },
-  { q: 'What if my parent calls too often?', a: 'Most families use 3–4 calls monthly. If they reach the 10-call limit, additional calls are $4.99 each or they can upgrade.' },
-  { q: "Is my parent's information safe?", a: 'Yes. We follow strict privacy protocols and never share personal information. See our Privacy Policy for full details.' },
-]
-
-function Testimonial({ img, name, location, quote }: { img: string; name: string; location: string; quote: string }) {
+function Testimonial({
+  img,
+  name,
+  location,
+  quote
+}: {
+  img: string
+  name: string
+  location: string
+  quote: string
+}) {
   return (
-    <div className="border rounded-2xl p-5 bg-white max-w-[480px] w-full text-left">
-      <div className="flex items-start gap-4">
-        <Image src={img} alt={name} width={48} height={48} className="rounded-full border border-slate-200" />
+    <article className="w-full max-w-[520px] bg-white rounded-2xl border border-slate-200 p-6 text-left">
+      <div className="flex items-center gap-3">
+        <Image src={img} alt={name} width={48} height={48} className="rounded-full object-cover" />
         <div>
           <div className="font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>{name}</div>
-          <div className="text-sm text-slate-500">{location}</div>
-          <p className="text-slate-700 mt-3">{quote}</p>
+          <div className="text-slate-500 text-sm">{location}</div>
         </div>
       </div>
-    </div>
+      <p className="mt-4 text-slate-700">{quote}</p>
+    </article>
   )
 }

@@ -10,17 +10,30 @@ import '@/styles/globals.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import { inter } from '@/components/Fonts'
-import { initPostHog, phCapture } from '@/lib/posthog'
+
+// PostHog helpers (auto-capture + custom events)
+import { initPostHog, phCapture, identifyProspect } from '@/lib/posthog'
 
 export default function App({ Component, pageProps }: AppProps & { pageProps: any }) {
+  // one client for the whole app
   const [supabase] = useState(() => createBrowserSupabaseClient())
   const router = useRouter()
 
-  // Init PostHog once and wire Next.js pageviews
   useEffect(() => {
+    // init PH (safe no-op on server)
     initPostHog()
+
+    // first paint pageview
     phCapture('$pageview', { path: window.location.pathname + window.location.search })
-    const onRoute = (url: string) => phCapture('$pageview', { path: url })
+
+    const onRoute = (url: string) => {
+      phCapture('$pageview', { path: url })
+      if (url.startsWith('/pricing') || url.includes('#pricing')) {
+        identifyProspect({ interest: 'pricing_view' })
+        phCapture('pricing_view')
+      }
+    }
+
     router.events.on('routeChangeComplete', onRoute)
     return () => router.events.off('routeChangeComplete', onRoute)
   }, [router.events])
