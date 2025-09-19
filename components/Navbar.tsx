@@ -37,15 +37,19 @@ export default function Navbar() {
 
   const CenterLinks = () => (
     <>
-      <Link href="/what-we-solve" className="nav-link">
+      {/* EXACTLY as requested: this goes to a separate page */}
+      <Link href="/whatwesolve" className="nav-link">
         What we solve
       </Link>
+
+      {/* All other center items link to homepage sections */}
       <a href="#how-it-works" className="nav-link">
         How it works
       </a>
-      <Link href="/pricing" className="nav-link">
+      <a href="#pricing" className="nav-link">
         Pricing
-      </Link>
+      </a>
+
       {user ? (
         <Link href="/dashboard" className="nav-link">
           Dashboard
@@ -70,7 +74,7 @@ export default function Navbar() {
         <div className="h-16 flex items-center justify-between">
           {/* Left: Logo */}
           <Link href="/" aria-label="Boroma home" className="shrink-0 inline-flex items-center gap-2">
-            {/* If your file name has a space (“Boroma logo.svg”), encode the space below */}
+            {/* Space in filename encoded to avoid 404s */}
             <Image
               src="/Boroma%20logo.svg"
               alt="Boroma"
