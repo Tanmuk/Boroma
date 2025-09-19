@@ -13,7 +13,7 @@ export default function Home() {
   const BASE_ANNUAL = 348
   const basePrice = annual ? BASE_ANNUAL : BASE_MONTHLY
 
-  // 40% off computed without decimals
+  // 40% off — integer display only
   const discounted = useMemo(() => Math.round(basePrice * 0.6), [basePrice])
 
   return (
@@ -32,6 +32,29 @@ export default function Home() {
         />
         <meta property="og:url" content="https://boroma.site/" />
         <meta property="og:type" content="website" />
+
+        {/* Structured data (Organization). Using the members' toll-free as contact for SEO until a separate support number exists. */}
+        <script
+          type="application/ld+json"
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: 'Boroma',
+              url: 'https://boroma.site',
+              contactPoint: [
+                {
+                  '@type': 'ContactPoint',
+                  telephone: '+1-877-766-6307',
+                  contactType: 'customer support',
+                  areaServed: 'US',
+                  availableLanguage: ['English', 'Spanish', 'Chinese'],
+                },
+              ],
+            }),
+          }}
+        />
       </Head>
 
       {/* ================= HERO ================= */}
@@ -47,8 +70,8 @@ export default function Home() {
             className="mx-auto mt-4 font-semibold leading-tight"
             style={{
               fontFamily: 'Mona Sans, ui-sans-serif, system-ui',
-              fontWeight: 600,
-              fontSize: '60px',
+              // Mobile-safe sizing using clamp for responsiveness
+              fontSize: 'clamp(34px, 6vw, 60px)',
             }}
           >
             On-demand, 24/7 tech help, with the patience your loved ones deserve
@@ -59,7 +82,7 @@ export default function Home() {
             informed with automatic summaries.
           </p>
 
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
             <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
             <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
           </div>
@@ -77,13 +100,13 @@ export default function Home() {
               alt="Patient phone-first help"
               width={1600}
               height={1000}
-              className="w-full max-w-5xl mx-auto h-[450px] md:h-[550px] object-cover rounded-2xl border border-slate-200"
+              className="w-full max-w-5xl mx-auto h-[420px] md:h-[540px] object-cover rounded-2xl border border-slate-200"
               priority
             />
 
             {/* Left card */}
-            <div className="hidden md:block absolute left-6 bottom-6">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[240px] text-left">
+            <div className="hidden md:block absolute left-4 md:left-6 bottom-4 md:bottom-6">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[230px] md:w-[240px] text-left">
                 <div className="text-[11px] font-semibold uppercase text-[#FF5B04]" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
                   Phone first
                 </div>
@@ -95,8 +118,8 @@ export default function Home() {
             </div>
 
             {/* Right card */}
-            <div className="hidden md:block absolute right-6 bottom-6">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[260px] text-left">
+            <div className="hidden md:block absolute right-4 md:right-6 bottom-4 md:bottom-6">
+              <div className="bg-white border border-slate-200 rounded-2xl shadow-md p-4 w-[250px] md:w-[260px] text-left">
                 <div className="text-[11px] font-semibold uppercase text-[#FF5B04]" style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui' }}>
                   Scam aware coaching
                 </div>
@@ -219,8 +242,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= HOW IT WORKS ================= */}
-      <section id="how-it-works" className="relative isolate">
+      {/* ================= HOW IT WORKS (min 80vh + centered) ================= */}
+      <section id="how-it-works" className="relative isolate min-h-[80vh] grid content-center">
         <div className="absolute inset-0 bg-white" />
         <div className="container relative z-10 mx-auto px-4 py-16">
           <div className="grid md:grid-cols-2 gap-8 items-center justify-items-center">
@@ -239,7 +262,7 @@ export default function Home() {
 
             <ol className="grid gap-4 w-full max-w-[560px]">
               {[
-                ['Step 1: Your Parent Calls', 'Just one TOLL FREEE number to remember:  No apps, no accounts, no passwords.'],
+                ['Step 1: Your Parent Calls', 'Just one number to remember: Toll Free number. No apps, no accounts, no passwords.'],
                 ['Step 2: Patient Help in Their Language', 'Our agents listen carefully, explain clearly, and work at your parent’s pace.'],
                 ['Step 3: You Stay Informed', 'Get a text summary of what happened, what was fixed, and any follow-up needed.'],
               ].map(([h, d], i) => (
@@ -288,16 +311,25 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ================= SCAM-FREE PLEDGE (green background per request) ================= */}
+      {/* ================= SCAM-FREE PLEDGE (green) — stronger contrast heading ================= */}
       <section className="relative isolate">
         <div className="absolute inset-0 bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 py-16">
+          <div className="text-center">
+            <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold">Safety</div>
+            <h2
+              className="mt-2 font-semibold text-white"
+              style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
+            >
+              Our Scam-Free Pledge
+            </h2>
+          </div>
           <TrustPledge />
         </div>
       </section>
 
-      {/* ================= TESTIMONIALS ================= */}
-      <section id="testimonials" className="relative isolate">
+      {/* ================= TESTIMONIALS (min 80vh + centered) ================= */}
+      <section id="testimonials" className="relative isolate min-h-[80vh] grid content-center">
         <div className="absolute inset-0 bg-white" />
         <div className="container relative z-10 mx-auto px-4 py-16 text-center">
           <div>
@@ -351,7 +383,7 @@ export default function Home() {
           <div className="mt-8 grid lg:grid-cols-[1fr_420px] gap-8 items-start text-left">
             {/* Main pricing card */}
             <div className="border rounded-2xl p-6 bg-white text-slate-900">
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="text-sm uppercase text-[#FF5B04] font-semibold">Boroma Plan</div>
                   <div className="text-2xl font-semibold mt-1">{annual ? 'Annual' : 'Monthly'}</div>
@@ -370,7 +402,7 @@ export default function Home() {
               </div>
 
               {/* Price row with strike-through base and discounted bold */}
-              <div className="mt-4 flex items-baseline gap-4">
+              <div className="mt-4 flex items-baseline gap-3 sm:gap-4 flex-wrap">
                 <div className="text-3xl line-through text-slate-400">${basePrice}</div>
                 <div className="text-5xl font-semibold text-slate-900">${discounted}</div>
                 <div className="text-base text-slate-500">/{annual ? 'yr' : 'mo'}</div>
@@ -378,7 +410,7 @@ export default function Home() {
 
               <ul className="mt-4 space-y-2 text-slate-700">
                 <li>• 24/7 phone first tech help</li>
-                <li>• Up to 10 calls per month, 35 minutes each</li>
+                <li>• Up to 10 calls/month, 35 mins each</li>
                 <li>• Toll free number for paid members</li>
                 <li>• Fridge magnet print</li>
                 <li>• Call report after each call</li>
@@ -388,7 +420,7 @@ export default function Home() {
                 <li>• Works on any phone, no apps</li>
               </ul>
 
-              <div className="mt-6 flex gap-3">
+              <div className="mt-6 flex flex-col sm:flex-row gap-3">
                 <Link href={`/signup?plan=${annual ? 'annual' : 'monthly'}`} className="btn btn-primary">
                   Get 24/7 support now
                 </Link>
@@ -465,7 +497,7 @@ export default function Home() {
           <p className="text-slate-600 mt-3 max-w-[700px] mx-auto">
             Get your family covered with patient, phone first help available day and night.
           </p>
-          <div className="mt-6 flex justify-center gap-3">
+          <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
             <a href="#pricing" className="btn btn-primary">Get 24/7 support now</a>
             <a href={`tel:${TRIAL_NUMBER}`} className="btn btn-outline">Try a call for free</a>
           </div>
@@ -501,7 +533,7 @@ function CheckIcon() {
   )
 }
 
-/* Problem icons */
+/* Problem icons (white for green background) */
 function ClockIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -520,7 +552,7 @@ function ChatIcon() {
     </svg>
   )
 }
-function ShieldIcon() {
+function ShieldIconWhite() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3Z" stroke="white" strokeOpacity="0.9" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -532,10 +564,10 @@ function ShieldIcon() {
 const PROBLEMS = [
   { title: 'Timing issues', desc: 'Waiting hours on hold during business hours only.', icon: <ClockIcon /> },
   { title: 'Fear of judgement', desc: 'Getting rushed through solutions they don’t understand.', icon: <ChatIcon /> },
-  { title: 'Safety worries', desc: 'Worrying about scams asking for passwords or access codes.', icon: <ShieldIcon /> },
+  { title: 'Safety worries', desc: 'Worrying about scams asking for passwords or access codes.', icon: <ShieldIconWhite /> },
 ]
 
-/* Solution icons */
+/* Solution icons (all orange — fixed Scam-aware to match) */
 function SmileIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -550,6 +582,14 @@ function GlobeIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="12" r="9" stroke="#FF5B04" strokeWidth="2" />
       <path d="M3 12h18M12 3c3 3.5 3 14 0 18M12 3c-3 3.5-3 14 0 18" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  )
+}
+function ShieldIconOrange() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3Z" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9 12l2 2 4-4" stroke="#FF5B04" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
@@ -581,7 +621,8 @@ function SunIcon() {
 const SOLUTION_LEFT = [
   { title: 'Always patient', desc: 'Never rushed, never judged, always kind.', icon: <SmileIcon /> },
   { title: 'Speak your language', desc: 'English, Spanish, Chinese — switch anytime.', icon: <GlobeIcon /> },
-  { title: 'Scam-aware', desc: 'We never ask for passwords, OTPs, or personal info.', icon: <ShieldIcon /> },
+  // FIXED: orange shield like others
+  { title: 'Scam-aware', desc: 'We never ask for passwords, OTPs, or personal info.', icon: <ShieldIconOrange /> },
 ]
 
 const SOLUTION_RIGHT = [
