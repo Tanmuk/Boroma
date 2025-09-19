@@ -1,56 +1,137 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useUser } from '@supabase/auth-helpers-react'
 import { phCapture } from '@/lib/posthog'
-import { FREE_TRY_NUMBER } from '@/lib/env.client'
+
+/**
+ * Navbar layout (desktop):
+ * ┌───────────────┬───────────────────────────────┬────────────────────┐
+ * │   Logo (L)    │   Centered menu links (C)     │  Primary CTA (R)   │
+ * └───────────────┴───────────────────────────────┴────────────────────┘
+ * - Sticky + blur on scroll
+ * - Signed-in users see "Dashboard" in the center menu; signed-out see "Sign in"
+ * - Single primary CTA on the right: “Get 24/7 support now” -> scrolls to #pricing
+ */
 
 export default function Navbar() {
+  const user = useUser()
   const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
 
-  const navClick = (label: string) => () => phCapture('nav_link_click', { label })
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 2)
+    onScroll()
+    window.addEventListener('scroll', onScroll)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  const handleCTAClick = () => {
+    phCapture('nav_primary_cta')
+    if (typeof window !== 'undefined') {
+      const el = document.querySelector('#pricing')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      else window.location.href = '/pricing'
+    }
+  }
+
+  const CenterLinks = () => (
+    <>
+      <Link href="/what-we-solve" className="nav-link">
+        What we solve
+      </Link>
+      <a href="#how-it-works" className="nav-link">
+        How it works
+      </a>
+      <Link href="/pricing" className="nav-link">
+        Pricing
+      </Link>
+      {user ? (
+        <Link href="/dashboard" className="nav-link">
+          Dashboard
+        </Link>
+      ) : (
+        <Link href="/signin" className="nav-link">
+          Sign in
+        </Link>
+      )}
+    </>
+  )
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur bg-white/70 border-b border-slate-100">
-      <div className="mx-auto container px-4 h-14 flex items-center justify-between">
-        <Link href="/" aria-label="Boroma home" onClick={navClick('Home')}>
-          <Image src="/logo.svg" alt="Boroma" width={92} height={20} priority />
-        </Link>
+    <header
+      className={[
+        'sticky top-0 z-50 border-b border-slate-100',
+        'backdrop-blur supports-[backdrop-filter]:bg-white/70',
+        scrolled ? 'bg-white/70' : 'bg-white/50',
+      ].join(' ')}
+    >
+      <div className="mx-auto container px-4">
+        <div className="h-16 flex items-center justify-between">
+          {/* Left: Logo */}
+          <Link href="/" aria-label="Boroma home" className="shrink-0 inline-flex items-center gap-2">
+            {/* If your file name has a space (“Boroma logo.svg”), encode the space below */}
+            <Image
+              src="/Boroma%20logo.svg"
+              alt="Boroma"
+              width={108}
+              height={24}
+              priority
+              className="h-6 w-auto"
+            />
+          </Link>
 
-        <nav className="hidden md:flex items-center gap-6">
-          <a href="/what-we-solve" onClick={navClick('What we solve')} className="hover:text-slate-900 text-slate-700">What we solve</a>
-          <a href="#how-it-works" onClick={navClick('How it works')} className="hover:text-slate-900 text-slate-700">How it works</a>
-          <a href="/pricing" onClick={navClick('Pricing')} className="hover:text-slate-900 text-slate-700">Pricing</a>
-          <a href="/dashboard" onClick={navClick('Dashboard')} className="hover:text-slate-900 text-slate-700">Dashboard</a>
+          {/* Center: Menu (desktop) */}
+          <nav className="hidden md:flex flex-1 items-center justify-center gap-8">
+            <CenterLinks />
+          </nav>
 
-          <a
-            href={`tel:${FREE_TRY_NUMBER}`}
-            onClick={navClick('Try free call')}
-            className="rounded-full border border-[#FF5B04]/30 px-4 py-2 text-[#FF5B04] hover:bg-[#FFEDD9]"
+          {/* Right: Primary CTA (desktop) */}
+          <div className="hidden md:block">
+            <button
+              onClick={handleCTAClick}
+              className="rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] text-white px-5 py-2.5 text-sm font-semibold shadow-sm hover:opacity-95 transition"
+            >
+              Get 24/7 support now
+            </button>
+          </div>
+
+          {/* Mobile menu button */}
+          <button
+            className="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg border border-slate-200"
+            onClick={() => setOpen((v) => !v)}
+            aria-label="Open menu"
           >
-            Try a call for free
-          </a>
-        </nav>
-
-        <button
-          className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200"
-          onClick={() => setOpen(!open)}
-          aria-label="Open menu"
-        >
-          <span className="i-lucide-menu" />
-        </button>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M4 6h16M4 12h16M4 18h16" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       </div>
 
+      {/* Mobile drawer */}
       {open && (
-        <div className="md:hidden border-t border-slate-100 bg-white">
-          <div className="container mx-auto px-4 py-3 flex flex-col gap-2">
-            <a href="/what-we-solve" onClick={navClick('What we solve (mobile)')}>What we solve</a>
-            <a href="#how-it-works" onClick={navClick('How it works (mobile)')}>How it works</a>
-            <a href="/pricing" onClick={navClick('Pricing (mobile)')}>Pricing</a>
-            <a href="/dashboard" onClick={navClick('Dashboard (mobile)')}>Dashboard</a>
-            <a href={`tel:${FREE_TRY_NUMBER}`} onClick={navClick('Try free call (mobile)')}>Try a call for free</a>
+        <div className="md:hidden border-t border-slate-100 bg-white/90 backdrop-blur">
+          <div className="container mx-auto px-4 py-4 flex flex-col gap-3">
+            <CenterLinks />
+            <button
+              onClick={() => {
+                setOpen(false)
+                handleCTAClick()
+              }}
+              className="mt-2 rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] text-white px-5 py-3 text-sm font-semibold shadow-sm"
+            >
+              Get 24/7 support now
+            </button>
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        .nav-link {
+          @apply text-slate-700 hover:text-slate-900 transition-colors text-sm font-medium;
+        }
+      `}</style>
     </header>
   )
 }
