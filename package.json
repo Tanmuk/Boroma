@@ -2,13 +2,12 @@
   "name": "boroma",
   "version": "1.0.0",
   "private": true,
-  "engines": { "node": "20.x" }
+  "engines": { "node": "20.x" },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
     "postbuild": "next-sitemap"
-
   },
   "dependencies": {
     "next": "14.2.4",
