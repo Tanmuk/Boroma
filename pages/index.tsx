@@ -58,7 +58,7 @@ export default function Home() {
         {/* green footer band behind the image */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[220px] bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 pt-16 md:pt-24 pb-12 text-center">
-          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FFEDD9] text-[#FF5B04]">
+          <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#1A0C05] text-[#FF5B04]">
             Launch offer: Use code LAUNCH40 to get 40% off
           </div>
 
