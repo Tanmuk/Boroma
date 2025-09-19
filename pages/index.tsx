@@ -4,16 +4,13 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import TrustPledge from '@/components/TrustPledge'
 import { TRIAL_NUMBER } from '@/lib/env.client'
+import { phCapture } from '@/lib/posthog'
 
 export default function Home() {
   const [annual, setAnnual] = useState(false)
-
-  // Base prices (no decimals rendered anywhere)
   const BASE_MONTHLY = 29
   const BASE_ANNUAL = 348
   const basePrice = annual ? BASE_ANNUAL : BASE_MONTHLY
-
-  // 40% off — integer display only
   const discounted = useMemo(() => Math.round(basePrice * 0.6), [basePrice])
 
   return (
@@ -26,17 +23,11 @@ export default function Home() {
         />
         <link rel="canonical" href="https://boroma.site/" />
         <meta property="og:title" content="Boroma — Patient 24/7 phone-first tech help for seniors" />
-        <meta
-          property="og:description"
-          content="On-demand, 24/7 tech help with the patience your loved ones deserve. English, Spanish, Chinese."
-        />
+        <meta property="og:description" content="On-demand, 24/7 tech help with the patience your loved ones deserve." />
         <meta property="og:url" content="https://boroma.site/" />
         <meta property="og:type" content="website" />
-
-        {/* Structured data (Organization). Using the members' toll-free as contact for SEO until a separate support number exists. */}
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
