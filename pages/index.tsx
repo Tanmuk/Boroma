@@ -339,7 +339,7 @@ export default function Home() {
           </div>
 
           <div className="mt-8">
-            <a href="/pledge" className="btn btn-light">
+            <a href="/legal/pledge" className="btn btn-light">
               Read the full pledge
             </a>
           </div>
