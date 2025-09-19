@@ -38,15 +38,15 @@ export default function Navbar() {
   const CenterLinks = () => (
     <>
       {/* EXACTLY as requested: this goes to a separate page */}
-      <Link href="/whatwesolve" className="nav-link">
+      <Link href="/what-we-solve" className="nav-link">
         What we solve
       </Link>
 
       {/* All other center items link to homepage sections */}
-      <a href="#how-it-works" className="nav-link">
+      <a href="/#how-it-works" className="nav-link">
         How it works
       </a>
-      <a href="#pricing" className="nav-link">
+      <a href="/#pricing" className="nav-link">
         Pricing
       </a>
 
