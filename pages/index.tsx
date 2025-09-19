@@ -307,12 +307,11 @@ export default function Home() {
         <div className="absolute inset-0 bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 py-16">
           <div className="text-center">
-            <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold">Safety</div>
+            <div className="text-[#FFEDD9] text-xs uppercase tracking-wide font-semibold"></div>
             <h2
               className="mt-2 font-semibold text-white"
               style={{ fontFamily: 'Mona Sans, ui-sans-serif, system-ui', fontSize: '36px' }}
             >
-              Our Scam-Free Pledge
             </h2>
           </div>
           <TrustPledge />
