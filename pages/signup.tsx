@@ -29,34 +29,41 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    // 1) Create auth user with name metadata
+    const full_name = `${firstName} ${lastName}`.trim()
+
+    // 1) Create auth user; store full_name in metadata
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { first_name: firstName, last_name: lastName },
-      },
+      options: { data: { full_name } },
     })
-    if (signUpError || !signUpData.user) {
+    if (signUpError || !signUpData?.user) {
       setLoading(false)
       setError(signUpError?.message || 'Unable to sign up.')
       return
     }
 
-    // 2) Upsert profile (keep existing schema; store full_name)
-    const userId = signUpData.user.id
-    const full_name = `${firstName} ${lastName}`.trim()
-    const { error: profileError } = await supabase.from('profiles').upsert(
-      { id: userId, full_name, email },
-      { onConflict: 'id' }
-    )
-    if (profileError) {
-      setLoading(false)
-      setError(profileError.message)
-      return
+    // 2) Let the DB trigger create the profile; then READ it (no client insert)
+    const uid = signUpData.user.id
+    let profile: any = null
+    let attempts = 0
+    const backoff = [200, 400, 800, 1200]
+    while (!profile && attempts < backoff.length) {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('id', uid)
+        .single()
+      if (!error && data) {
+        profile = data
+      } else {
+        await new Promise((r) => setTimeout(r, backoff[attempts]))
+        attempts++
+      }
     }
+    // Optional: you can surface a soft message if profile is still null, but continue.
 
-    // 3) Start Stripe checkout through backend
+    // 3) Begin Stripe checkout via your API (unchanged)
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
     try {
@@ -118,8 +125,6 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {/* Phone field removed as requested */}
-
             <div>
               <label className="block text-sm font-medium text-slate-800">Email address</label>
               <input
@@ -146,7 +151,7 @@ export default function SignUpPage() {
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-2 my-auto rounded px-2 text-sm text-slate-600 hover:text-slate-900"
+                  className="absolute inset-y-0 right-2 my-auto rounded px-2 text-sm text-slate-600 hover:underline"
                   onClick={() => setShowPassword((s) => !s)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
