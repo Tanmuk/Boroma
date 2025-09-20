@@ -8,7 +8,8 @@ export default function SignUpPage() {
   const router = useRouter()
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly')
 
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -17,6 +18,7 @@ export default function SignUpPage() {
   const strength = getPasswordStrength(password)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     const q = new URLSearchParams(window.location.search)
     const p = q.get('plan')
     if (p === 'annual') setPlan('annual')
@@ -27,27 +29,34 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    // 1) Create auth user
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
+    // 1) Create auth user (store names in metadata just in case you use them later)
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { first_name: firstName, last_name: lastName },
+      },
+    })
     if (signUpError || !signUpData.user) {
       setLoading(false)
       setError(signUpError?.message || 'Unable to sign up.')
       return
     }
 
-    // 2) Upsert profile (no phone field per request)
+    // 2) Upsert profile row safely (won’t throw if the trigger already inserted one)
     const userId = signUpData.user.id
-    const { error: profileError } = await supabase.from('profiles').upsert(
-      { id: userId, full_name: fullName, email },
-      { onConflict: 'id' }
-    )
+    const full_name = `${firstName} ${lastName}`.trim()
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({ id: userId, full_name, email }, { onConflict: 'id' })
+
     if (profileError) {
       setLoading(false)
       setError(profileError.message)
       return
     }
 
-    // 3) Start Stripe checkout through backend
+    // 3) Kick off Stripe checkout via your API (includes the access token)
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
     try {
@@ -61,11 +70,8 @@ export default function SignUpPage() {
       })
       if (!res.ok) throw new Error(await res.text())
       const json = await res.json()
-      if (json?.url) {
-        window.location.href = json.url
-      } else {
-        throw new Error('No checkout URL returned.')
-      }
+      if (json?.url) window.location.href = json.url
+      else throw new Error('No checkout URL returned.')
     } catch (err: any) {
       setLoading(false)
       setError(err?.message || 'Checkout initialization failed.')
@@ -74,33 +80,40 @@ export default function SignUpPage() {
 
   return (
     <>
-      <Head>
-        <title>Sign up — Boroma</title>
-      </Head>
+      <Head><title>Sign up — Boroma</title></Head>
 
-      {/* Card UI that matches Sign in */}
       <section className="container mx-auto px-4 py-16 min-h-[70vh] grid place-items-center">
         <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-4xl font-semibold tracking-tight" style={{ fontFamily: 'Mona Sans, ui-sans-serif' }}>
-            Create your account
-          </h1>
+          <h1 className="text-4xl font-semibold tracking-tight">Create your account</h1>
           <p className="text-slate-600 mt-1">
             Enter your <strong>own</strong> details to manage billing. You can add members later from your dashboard.
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-800">Full name</label>
-              <input
-                type="text"
-                required
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-800">First name</label>
+                <input
+                  type="text"
+                  required
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-800">Last name</label>
+                <input
+                  type="text"
+                  required
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
             </div>
 
-            {/* Phone field removed as requested */}
+            {/* Phone field intentionally removed */}
 
             <div>
               <label className="block text-sm font-medium text-slate-800">Email address</label>
@@ -158,9 +171,7 @@ export default function SignUpPage() {
 
           <p className="mt-4 text-sm text-slate-700">
             Already have an account?{' '}
-            <Link href="/signin" className="text-[#FF5B04] hover:underline">
-              Sign in
-            </Link>
+            <Link href="/signin" className="text-[#FF5B04] hover:underline">Sign in</Link>
           </p>
         </div>
       </section>
@@ -168,8 +179,7 @@ export default function SignUpPage() {
   )
 }
 
-/* -------- helpers (shared with signin) -------- */
-
+/* ---- password helpers ---- */
 type Strength = 0 | 1 | 2 | 3 | 4
 function getPasswordStrength(pw: string): Strength {
   let score = 0
@@ -179,11 +189,13 @@ function getPasswordStrength(pw: string): Strength {
   if (/[^A-Za-z0-9]/.test(pw)) score++
   return Math.min(score, 4) as Strength
 }
-
 function StrengthHints({ strength, password }: { strength: Strength; password: string }) {
   const pct = [0, 25, 50, 75, 100][strength]
   const color =
-    strength <= 1 ? 'bg-rose-500' : strength === 2 ? 'bg-amber-500' : strength === 3 ? 'bg-lime-500' : 'bg-emerald-600'
+    strength <= 1 ? 'bg-rose-500'
+    : strength === 2 ? 'bg-amber-500'
+    : strength === 3 ? 'bg-lime-500'
+    : 'bg-emerald-600'
   const unmet = [
     { ok: password.length >= 8, text: 'At least 8 characters' },
     { ok: /[a-z]/.test(password) && /[A-Z]/.test(password), text: 'Both upper and lower case' },
