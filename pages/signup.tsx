@@ -29,7 +29,7 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    // 1) Create auth user with name metadata
+    // 1) Create auth user with metadata (first/last)
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -43,20 +43,12 @@ export default function SignUpPage() {
       return
     }
 
-    // 2) Upsert profile (keep existing schema; store full_name)
-    const userId = signUpData.user.id
-    const full_name = `${firstName} ${lastName}`.trim()
-    const { error: profileError } = await supabase.from('profiles').upsert(
-      { id: userId, full_name, email },
-      { onConflict: 'id' }
-    )
-    if (profileError) {
-      setLoading(false)
-      setError(profileError.message)
-      return
-    }
+    // IMPORTANT:
+    // Do NOT upsert into public.profiles on the client here.
+    // The database trigger (handle_new_user) will insert the profile safely,
+    // even if the user isn't signed in yet (avoids RLS/role issues).
 
-    // 3) Start Stripe checkout through backend
+    // 2) Start Stripe checkout through backend (token if available)
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
     try {
@@ -117,8 +109,6 @@ export default function SignUpPage() {
                 />
               </div>
             </div>
-
-            {/* Phone field removed as requested */}
 
             <div>
               <label className="block text-sm font-medium text-slate-800">Email address</label>
