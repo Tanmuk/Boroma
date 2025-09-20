@@ -1,153 +1,208 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import Head from 'next/head'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function SignupPage() {
+export default function SignUpPage() {
   const router = useRouter()
-  const planFromUrl = useMemo<'monthly'|'annual'>(() =>
-    (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('plan') === 'annual')
-      ? 'annual'
-      : 'monthly'
-  , [router.asPath])
+  const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly')
 
-  const [fullName, setFullName]   = useState('')
-  const [phone, setPhone]         = useState('')
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState<string | null>(null)
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const strength = getPasswordStrength(password)
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    const p = q.get('plan')
+    if (p === 'annual') setPlan('annual')
+  }, [])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
     setLoading(true)
+    setError(null)
 
-    // 1) Create the auth user
-    const { data: sign, error: signErr } = await supabase.auth.signUp({ email, password })
-    if (signErr) {
+    // 1) Create auth user
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
+    if (signUpError || !signUpData.user) {
       setLoading(false)
-      setError(signErr.message)
+      setError(signUpError?.message || 'Unable to sign up.')
       return
     }
 
-    const session = sign.session
-    if (!session) {
-      // If you ever enable email confirmations in Supabase, this will be null.
+    // 2) Upsert profile (no phone field per request)
+    const userId = signUpData.user.id
+    const { error: profileError } = await supabase.from('profiles').upsert(
+      { id: userId, full_name: fullName, email },
+      { onConflict: 'id' }
+    )
+    if (profileError) {
       setLoading(false)
-      setError('Check your email to confirm your account, then sign in to continue.')
+      setError(profileError.message)
       return
     }
 
-    // 2) Store profile info (includes email so you can see it in the dashboard)
-    await supabase.from('profiles').upsert({
-      id: sign.user!.id,
-      full_name: fullName,
-      phone,
-      email,
-    })
-
-    // 3) Start Stripe checkout (POST with Bearer token)
+    // 3) Start Stripe checkout through backend
+    const { data: session } = await supabase.auth.getSession()
+    const token = session.session?.access_token
     try {
-      const r = await fetch('/api/checkout/start', {
+      const res = await fetch('/api/checkout/start', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ plan: planFromUrl }),
+        body: JSON.stringify({ plan }),
       })
-      const json = await r.json()
-      if (!r.ok) throw new Error(json?.error || 'Could not start checkout')
-      window.location.href = json.url as string
+      if (!res.ok) throw new Error(await res.text())
+      const json = await res.json()
+      if (json?.url) {
+        window.location.href = json.url
+      } else {
+        throw new Error('No checkout URL returned.')
+      }
     } catch (err: any) {
-      setError(err.message || 'Checkout failed')
       setLoading(false)
+      setError(err?.message || 'Checkout initialization failed.')
     }
   }
 
   return (
     <>
       <Head>
-        <title>Create your account • Boroma</title>
+        <title>Sign up — Boroma</title>
       </Head>
 
-      <div className="min-h-screen bg-orange-50">
-        <div className="max-w-3xl mx-auto px-4 py-10">
-          <h1 className="text-4xl font-extrabold text-orange-900">Create your account</h1>
-          <p className="mt-2 text-slate-700">
-            Enter <b>your own</b> details to manage billing and add members later from your dashboard.
+      {/* Card UI that matches Sign in */}
+      <section className="container mx-auto px-4 py-16 min-h-[70vh] grid place-items-center">
+        <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h1 className="text-4xl font-semibold tracking-tight" style={{ fontFamily: 'Mona Sans, ui-sans-serif' }}>
+            Create your account
+          </h1>
+          <p className="text-slate-600 mt-1">
+            Enter your <strong>own</strong> details to manage billing. You can add members later from your dashboard.
           </p>
 
-          {error && (
-            <div className="mt-5 rounded-lg bg-red-50 text-red-800 border border-red-200 px-4 py-3">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={onSubmit} className="mt-6 space-y-5">
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700">Full name</label>
+              <label className="block text-sm font-medium text-slate-800">Full name</label>
               <input
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                type="text"
+                required
+                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700">Phone (US)</label>
-              <input
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1XXXXXXXXXX"
-              />
-              <p className="mt-1 text-xs text-slate-500">
-                This is for your account; members for Boroma service are added later.
-              </p>
-            </div>
+            {/* Phone field removed as requested */}
 
             <div>
-              <label className="block text-sm font-medium text-slate-700">Email address</label>
+              <label className="block text-sm font-medium text-slate-800">Email address</label>
               <input
                 type="email"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                autoComplete="email"
+                required
+                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700">Password</label>
-              <input
-                type="password"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-400"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
+              <label className="block text-sm font-medium text-slate-800">Password</label>
+              <div className="relative mt-1">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  required
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 pr-10 outline-none focus:ring-2 focus:ring-orange-400"
+                  placeholder="Create a strong password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-2 my-auto rounded px-2 text-sm text-slate-600 hover:text-slate-900"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+
+              <StrengthHints strength={strength} password={password} />
             </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-gradient-to-b from-orange-500 to-orange-600 text-white font-semibold py-3 shadow hover:from-orange-600 hover:to-orange-700 disabled:opacity-60"
-              >
-                {loading ? 'Starting checkout…' : 'Continue to payment'}
-              </button>
-            </div>
+            {error && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+            )}
 
-            <p className="text-xs text-slate-500">
-              Plan: <b>{planFromUrl === 'annual' ? 'Annual' : 'Monthly'}</b>. You can add members after checkout.
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] px-4 py-3 font-semibold text-white shadow-sm disabled:opacity-60"
+            >
+              {loading ? 'Continuing…' : 'Continue to payment'}
+            </button>
+
+            <p className="text-xs text-slate-600">
+              Plan: <span className="font-semibold capitalize">{plan}</span>. You can add members after checkout.
             </p>
           </form>
+
+          <p className="mt-4 text-sm text-slate-700">
+            Already have an account?{' '}
+            <Link href="/signin" className="text-[#FF5B04] hover:underline">
+              Sign in
+            </Link>
+          </p>
         </div>
-      </div>
+      </section>
     </>
+  )
+}
+
+/* -------- helpers (shared with signin) -------- */
+
+type Strength = 0 | 1 | 2 | 3 | 4
+function getPasswordStrength(pw: string): Strength {
+  let score = 0
+  if (pw.length >= 8) score++
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++
+  if (/\d/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  return Math.min(score, 4) as Strength
+}
+
+function StrengthHints({ strength, password }: { strength: Strength; password: string }) {
+  const pct = [0, 25, 50, 75, 100][strength]
+  const color =
+    strength <= 1 ? 'bg-rose-500' : strength === 2 ? 'bg-amber-500' : strength === 3 ? 'bg-lime-500' : 'bg-emerald-600'
+  const unmet = [
+    { ok: password.length >= 8, text: 'At least 8 characters' },
+    { ok: /[a-z]/.test(password) && /[A-Z]/.test(password), text: 'Both upper and lower case' },
+    { ok: /\d/.test(password), text: 'A number (0-9)' },
+    { ok: /[^A-Za-z0-9]/.test(password), text: 'A symbol (!@#$%)' },
+  ]
+  return (
+    <div className="mt-2">
+      <div className="h-1.5 w-full rounded-full bg-slate-200">
+        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+        {unmet.map((i, idx) => (
+          <li key={idx} className={`flex items-center gap-1 ${i.ok ? 'text-emerald-700' : ''}`}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${i.ok ? 'bg-emerald-600' : 'bg-slate-300'}`} />
+            {i.text}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
