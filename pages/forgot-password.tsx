@@ -3,6 +3,8 @@ import Head from 'next/head'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabaseClient'
 
+const SITE = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
@@ -12,8 +14,9 @@ export default function ForgotPassword() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setMsg(null); setErr(null); setLoading(true)
-    const redirectTo = `${window.location.origin}/reset-password` // changed from /login → /reset-password
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${SITE}/reset-password`,
+    })
     setLoading(false)
     if (error) { setErr(error.message); return }
     setMsg('Check your email for a reset link.')
@@ -25,7 +28,7 @@ export default function ForgotPassword() {
       <main className="container mx-auto px-4 py-16 min-h-[70vh] grid place-items-center">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-3xl font-semibold" style={{ fontFamily: 'Mona Sans, ui-sans-serif' }}>Reset password</h1>
-          <p className="text-slate-600 mt-1">We will email you a link to reset it.</p>
+          <p className="text-slate-600 mt-1">We’ll email you a link to reset it.</p>
 
           {msg && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</div>}
           {err && <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
@@ -42,7 +45,7 @@ export default function ForgotPassword() {
                 required
               />
             </div>
-            <button className="btn btn-primary w-full rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] px-4 py-3 font-semibold text-white shadow-sm disabled:opacity-60" disabled={loading}>
+            <button className="w-full rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] px-4 py-3 font-semibold text-white shadow-sm disabled:opacity-60" disabled={loading}>
               {loading ? 'Sending…' : 'Send reset link'}
             </button>
           </form>
