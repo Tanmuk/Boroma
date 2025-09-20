@@ -19,34 +19,13 @@ export default function SignInPage() {
     setError(null)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
-    if (error) {
-      setError(error.message)
-      return
-    }
+    if (error) { setError(error.message); return }
     router.push('/dashboard')
-  }
-
-  async function onForgotPassword() {
-    if (!email) {
-      setError('Enter your email first to receive a reset link.')
-      return
-    }
-    setError(null)
-    const redirectTo =
-      (process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '')) + '/signin'
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
-    if (error) {
-      setError(error.message)
-    } else {
-      setError('Password reset link sent. Please check your email.')
-    }
   }
 
   return (
     <>
-      <Head>
-        <title>Sign in — Boroma</title>
-      </Head>
+      <Head><title>Sign in — Boroma</title></Head>
 
       <section className="container mx-auto px-4 py-16 min-h-[70vh] grid place-items-center">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -72,13 +51,9 @@ export default function SignInPage() {
             <div>
               <div className="flex items-center justify-between">
                 <label className="block text-sm font-medium text-slate-800">Password</label>
-                <button
-                  type="button"
-                  onClick={onForgotPassword}
-                  className="text-sm text-[#FF5B04] hover:underline"
-                >
+                <Link href="/forgot-password" className="text-sm text-[#FF5B04] hover:underline">
                   Forgot password?
-                </button>
+                </Link>
               </div>
 
               <div className="relative mt-1">
@@ -119,9 +94,7 @@ export default function SignInPage() {
 
           <p className="mt-4 text-sm text-slate-700">
             Don’t have an account?{' '}
-            <Link href="/signup" className="text-[#FF5B04] hover:underline">
-              Sign up
-            </Link>
+            <Link href="/signup" className="text-[#FF5B04] hover:underline">Sign up</Link>
           </p>
         </div>
       </section>
@@ -129,8 +102,7 @@ export default function SignInPage() {
   )
 }
 
-/* -------- helpers (no new deps) -------- */
-
+/* ---- shared helpers ---- */
 type Strength = 0 | 1 | 2 | 3 | 4
 function getPasswordStrength(pw: string): Strength {
   let score: number = 0
@@ -140,11 +112,9 @@ function getPasswordStrength(pw: string): Strength {
   if (/[^A-Za-z0-9]/.test(pw)) score++
   return Math.min(score, 4) as Strength
 }
-
 function StrengthHints({ strength, password }: { strength: Strength; password: string }) {
   const pct = [0, 25, 50, 75, 100][strength]
-  const color =
-    strength <= 1 ? 'bg-rose-500' : strength === 2 ? 'bg-amber-500' : strength === 3 ? 'bg-lime-500' : 'bg-emerald-600'
+  const color = strength <= 1 ? 'bg-rose-500' : strength === 2 ? 'bg-amber-500' : strength === 3 ? 'bg-lime-500' : 'bg-emerald-600'
   const unmet = [
     { ok: password.length >= 8, text: 'At least 8 characters' },
     { ok: /[a-z]/.test(password) && /[A-Z]/.test(password), text: 'Both upper and lower case' },
@@ -153,9 +123,7 @@ function StrengthHints({ strength, password }: { strength: Strength; password: s
   ]
   return (
     <div className="mt-2">
-      <div className="h-1.5 w-full rounded-full bg-slate-200">
-        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-200"><div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} /></div>
       <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
         {unmet.map((i, idx) => (
           <li key={idx} className={`flex items-center gap-1 ${i.ok ? 'text-emerald-700' : ''}`}>
