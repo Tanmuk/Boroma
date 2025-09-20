@@ -29,7 +29,7 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    // 1) Create auth user (store names in metadata just in case you use them later)
+    // 1) Create auth user with name metadata
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -43,20 +43,20 @@ export default function SignUpPage() {
       return
     }
 
-    // 2) Upsert profile row safely (won’t throw if the trigger already inserted one)
+    // 2) Upsert profile (keep existing schema; store full_name)
     const userId = signUpData.user.id
     const full_name = `${firstName} ${lastName}`.trim()
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({ id: userId, full_name, email }, { onConflict: 'id' })
-
+    const { error: profileError } = await supabase.from('profiles').upsert(
+      { id: userId, full_name, email },
+      { onConflict: 'id' }
+    )
     if (profileError) {
       setLoading(false)
       setError(profileError.message)
       return
     }
 
-    // 3) Kick off Stripe checkout via your API (includes the access token)
+    // 3) Start Stripe checkout through backend
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
     try {
@@ -70,8 +70,11 @@ export default function SignUpPage() {
       })
       if (!res.ok) throw new Error(await res.text())
       const json = await res.json()
-      if (json?.url) window.location.href = json.url
-      else throw new Error('No checkout URL returned.')
+      if (json?.url) {
+        window.location.href = json.url
+      } else {
+        throw new Error('No checkout URL returned.')
+      }
     } catch (err: any) {
       setLoading(false)
       setError(err?.message || 'Checkout initialization failed.')
@@ -84,7 +87,9 @@ export default function SignUpPage() {
 
       <section className="container mx-auto px-4 py-16 min-h-[70vh] grid place-items-center">
         <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-4xl font-semibold tracking-tight">Create your account</h1>
+          <h1 className="text-4xl font-semibold tracking-tight" style={{ fontFamily: 'Mona Sans, ui-sans-serif' }}>
+            Create your account
+          </h1>
           <p className="text-slate-600 mt-1">
             Enter your <strong>own</strong> details to manage billing. You can add members later from your dashboard.
           </p>
@@ -113,7 +118,7 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            {/* Phone field intentionally removed */}
+            {/* Phone field removed as requested */}
 
             <div>
               <label className="block text-sm font-medium text-slate-800">Email address</label>
@@ -179,7 +184,7 @@ export default function SignUpPage() {
   )
 }
 
-/* ---- password helpers ---- */
+/* ---- password helpers (same as signin) ---- */
 type Strength = 0 | 1 | 2 | 3 | 4
 function getPasswordStrength(pw: string): Strength {
   let score = 0
@@ -191,11 +196,7 @@ function getPasswordStrength(pw: string): Strength {
 }
 function StrengthHints({ strength, password }: { strength: Strength; password: string }) {
   const pct = [0, 25, 50, 75, 100][strength]
-  const color =
-    strength <= 1 ? 'bg-rose-500'
-    : strength === 2 ? 'bg-amber-500'
-    : strength === 3 ? 'bg-lime-500'
-    : 'bg-emerald-600'
+  const color = strength <= 1 ? 'bg-rose-500' : strength === 2 ? 'bg-amber-500' : strength === 3 ? 'bg-lime-500' : 'bg-emerald-600'
   const unmet = [
     { ok: password.length >= 8, text: 'At least 8 characters' },
     { ok: /[a-z]/.test(password) && /[A-Z]/.test(password), text: 'Both upper and lower case' },
@@ -204,9 +205,7 @@ function StrengthHints({ strength, password }: { strength: Strength; password: s
   ]
   return (
     <div className="mt-2">
-      <div className="h-1.5 w-full rounded-full bg-slate-200">
-        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-200"><div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} /></div>
       <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
         {unmet.map((i, idx) => (
           <li key={idx} className={`flex items-center gap-1 ${i.ok ? 'text-emerald-700' : ''}`}>
