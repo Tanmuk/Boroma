@@ -29,7 +29,7 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    // 1) Create auth user with metadata (first/last)
+    // 1) Create auth user with name metadata
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -43,12 +43,11 @@ export default function SignUpPage() {
       return
     }
 
-    // IMPORTANT:
-    // Do NOT upsert into public.profiles on the client here.
-    // The database trigger (handle_new_user) will insert the profile safely,
-    // even if the user isn't signed in yet (avoids RLS/role issues).
+    // IMPORTANT: Do NOT upsert into public.profiles here.
+    // The database trigger (handle_new_user) inserts the profile safely,
+    // avoiding any RLS timing issues.
 
-    // 2) Start Stripe checkout through backend (token if available)
+    // 2) Start Stripe checkout through backend
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
     try {
@@ -174,7 +173,7 @@ export default function SignUpPage() {
   )
 }
 
-/* ---- password helpers (same as signin) ---- */
+/* ---- password helpers ---- */
 type Strength = 0 | 1 | 2 | 3 | 4
 function getPasswordStrength(pw: string): Strength {
   let score = 0
