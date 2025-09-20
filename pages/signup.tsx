@@ -8,8 +8,8 @@ export default function SignUpPage() {
   const router = useRouter()
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly')
 
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
+  // ← single full name
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -29,12 +29,13 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    // 1) Create auth user with name metadata
+    // 1) Create auth user, store full_name in user metadata (no email confirmation)
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { first_name: firstName, last_name: lastName },
+        data: { full_name: fullName },
+        emailRedirectTo: undefined,
       },
     })
     if (signUpError || !signUpData.user) {
@@ -43,11 +44,19 @@ export default function SignUpPage() {
       return
     }
 
-    // IMPORTANT: Do NOT upsert into public.profiles here.
-    // The database trigger (handle_new_user) inserts the profile safely,
-    // avoiding any RLS timing issues.
+    // 2) Upsert profile with full_name (schema stays as before)
+    const userId = signUpData.user.id
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({ id: userId, full_name: fullName, email }, { onConflict: 'id' })
 
-    // 2) Start Stripe checkout through backend
+    if (profileError) {
+      setLoading(false)
+      setError(profileError.message)
+      return
+    }
+
+    // 3) Kick off Stripe checkout through your API (unchanged)
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
     try {
@@ -61,11 +70,8 @@ export default function SignUpPage() {
       })
       if (!res.ok) throw new Error(await res.text())
       const json = await res.json()
-      if (json?.url) {
-        window.location.href = json.url
-      } else {
-        throw new Error('No checkout URL returned.')
-      }
+      if (json?.url) window.location.href = json.url
+      else throw new Error('No checkout URL returned.')
     } catch (err: any) {
       setLoading(false)
       setError(err?.message || 'Checkout initialization failed.')
@@ -86,27 +92,15 @@ export default function SignUpPage() {
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-800">First name</label>
-                <input
-                  type="text"
-                  required
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-800">Last name</label>
-                <input
-                  type="text"
-                  required
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-800">Full name</label>
+              <input
+                type="text"
+                required
+                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
             </div>
 
             <div>
@@ -185,7 +179,8 @@ function getPasswordStrength(pw: string): Strength {
 }
 function StrengthHints({ strength, password }: { strength: Strength; password: string }) {
   const pct = [0, 25, 50, 75, 100][strength]
-  const color = strength <= 1 ? 'bg-rose-500' : strength === 2 ? 'bg-amber-500' : strength === 3 ? 'bg-lime-500' : 'bg-emerald-600'
+  const color =
+    strength <= 1 ? 'bg-rose-500' : strength === 2 ? 'bg-amber-500' : strength === 3 ? 'bg-lime-500' : 'bg-emerald-600'
   const unmet = [
     { ok: password.length >= 8, text: 'At least 8 characters' },
     { ok: /[a-z]/.test(password) && /[A-Z]/.test(password), text: 'Both upper and lower case' },
@@ -194,7 +189,9 @@ function StrengthHints({ strength, password }: { strength: Strength; password: s
   ]
   return (
     <div className="mt-2">
-      <div className="h-1.5 w-full rounded-full bg-slate-200"><div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} /></div>
+      <div className="h-1.5 w-full rounded-full bg-slate-200">
+        <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
       <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
         {unmet.map((i, idx) => (
           <li key={idx} className={`flex items-center gap-1 ${i.ok ? 'text-emerald-700' : ''}`}>
