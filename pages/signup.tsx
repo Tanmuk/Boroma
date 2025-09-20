@@ -8,7 +8,6 @@ export default function SignUpPage() {
   const router = useRouter()
   const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly')
 
-  // ← single full name
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,7 +17,6 @@ export default function SignUpPage() {
   const strength = getPasswordStrength(password)
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
     const q = new URLSearchParams(window.location.search)
     const p = q.get('plan')
     if (p === 'annual') setPlan('annual')
@@ -29,34 +27,27 @@ export default function SignUpPage() {
     setLoading(true)
     setError(null)
 
-    // 1) Create auth user, store full_name in user metadata (no email confirmation)
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: undefined,
-      },
-    })
+    // 1) Create auth user
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
     if (signUpError || !signUpData.user) {
       setLoading(false)
       setError(signUpError?.message || 'Unable to sign up.')
       return
     }
 
-    // 2) Upsert profile with full_name (schema stays as before)
+    // 2) Upsert profile (no phone field per request)
     const userId = signUpData.user.id
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({ id: userId, full_name: fullName, email }, { onConflict: 'id' })
-
+    const { error: profileError } = await supabase.from('profiles').upsert(
+      { id: userId, full_name: fullName, email },
+      { onConflict: 'id' }
+    )
     if (profileError) {
       setLoading(false)
       setError(profileError.message)
       return
     }
 
-    // 3) Kick off Stripe checkout through your API (unchanged)
+    // 3) Start Stripe checkout through backend
     const { data: session } = await supabase.auth.getSession()
     const token = session.session?.access_token
     try {
@@ -70,8 +61,11 @@ export default function SignUpPage() {
       })
       if (!res.ok) throw new Error(await res.text())
       const json = await res.json()
-      if (json?.url) window.location.href = json.url
-      else throw new Error('No checkout URL returned.')
+      if (json?.url) {
+        window.location.href = json.url
+      } else {
+        throw new Error('No checkout URL returned.')
+      }
     } catch (err: any) {
       setLoading(false)
       setError(err?.message || 'Checkout initialization failed.')
@@ -80,8 +74,11 @@ export default function SignUpPage() {
 
   return (
     <>
-      <Head><title>Sign up — Boroma</title></Head>
+      <Head>
+        <title>Sign up — Boroma</title>
+      </Head>
 
+      {/* Card UI that matches Sign in */}
       <section className="container mx-auto px-4 py-16 min-h-[70vh] grid place-items-center">
         <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-4xl font-semibold tracking-tight" style={{ fontFamily: 'Mona Sans, ui-sans-serif' }}>
@@ -102,6 +99,8 @@ export default function SignUpPage() {
                 onChange={(e) => setFullName(e.target.value)}
               />
             </div>
+
+            {/* Phone field removed as requested */}
 
             <div>
               <label className="block text-sm font-medium text-slate-800">Email address</label>
@@ -159,7 +158,9 @@ export default function SignUpPage() {
 
           <p className="mt-4 text-sm text-slate-700">
             Already have an account?{' '}
-            <Link href="/signin" className="text-[#FF5B04] hover:underline">Sign in</Link>
+            <Link href="/signin" className="text-[#FF5B04] hover:underline">
+              Sign in
+            </Link>
           </p>
         </div>
       </section>
@@ -167,7 +168,8 @@ export default function SignUpPage() {
   )
 }
 
-/* ---- password helpers ---- */
+/* -------- helpers (shared with signin) -------- */
+
 type Strength = 0 | 1 | 2 | 3 | 4
 function getPasswordStrength(pw: string): Strength {
   let score = 0
@@ -177,6 +179,7 @@ function getPasswordStrength(pw: string): Strength {
   if (/[^A-Za-z0-9]/.test(pw)) score++
   return Math.min(score, 4) as Strength
 }
+
 function StrengthHints({ strength, password }: { strength: Strength; password: string }) {
   const pct = [0, 25, 50, 75, 100][strength]
   const color =
