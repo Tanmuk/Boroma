@@ -2,20 +2,12 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 import { useUser } from '@supabase/auth-helpers-react'
+import { useRouter } from 'next/router'
 import { phCapture } from '@/lib/posthog'
-
-/**
- * Navbar layout (desktop):
- * ┌───────────────┬───────────────────────────────┬────────────────────┐
- * │   Logo (L)    │   Centered menu links (C)     │  Primary CTA (R)   │
- * └───────────────┴───────────────────────────────┴────────────────────┘
- * - Sticky + blur on scroll
- * - Signed-in users see "Dashboard" in the center menu; signed-out see "Sign in"
- * - Single primary CTA on the right: “Get 24/7 support now” -> scrolls to #pricing
- */
 
 export default function Navbar() {
   const user = useUser()
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 
@@ -37,19 +29,15 @@ export default function Navbar() {
 
   const CenterLinks = () => (
     <>
-      {/* EXACTLY as requested: this goes to a separate page */}
       <Link href="/what-we-solve" className="nav-link">
         What we solve
       </Link>
-
-      {/* All other center items link to homepage sections */}
       <a href="/#how-it-works" className="nav-link">
         How it works
       </a>
       <a href="/#pricing" className="nav-link">
         Pricing
       </a>
-
       {user ? (
         <Link href="/dashboard" className="nav-link">
           Dashboard
@@ -62,6 +50,8 @@ export default function Navbar() {
     </>
   )
 
+  const onDashboard = router.pathname.startsWith('/dashboard')
+
   return (
     <header
       className={[
@@ -72,9 +62,7 @@ export default function Navbar() {
     >
       <div className="mx-auto container px-4">
         <div className="h-16 flex items-center justify-between">
-          {/* Left: Logo */}
           <Link href="/" aria-label="Boroma home" className="shrink-0 inline-flex items-center gap-2">
-            {/* Space in filename encoded to avoid 404s */}
             <Image
               src="/Boroma%20logo.svg"
               alt="Boroma"
@@ -85,19 +73,20 @@ export default function Navbar() {
             />
           </Link>
 
-          {/* Center: Menu (desktop) */}
           <nav className="hidden md:flex flex-1 items-center justify-center gap-8">
             <CenterLinks />
           </nav>
 
           {/* Right: Primary CTA (desktop) */}
           <div className="hidden md:block">
-            <button
-              onClick={handleCTAClick}
-              className="rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] text-white px-5 py-2.5 text-sm font-semibold shadow-sm hover:opacity-95 transition"
-            >
-              Get 24/7 support now
-            </button>
+            {!onDashboard && (
+              <button
+                onClick={handleCTAClick}
+                className="rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] text-white px-5 py-2.5 text-sm font-semibold shadow-sm hover:opacity-95 transition"
+              >
+                Get 24/7 support now
+              </button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -118,15 +107,17 @@ export default function Navbar() {
         <div className="md:hidden border-t border-slate-100 bg-white/90 backdrop-blur">
           <div className="container mx-auto px-4 py-4 flex flex-col gap-3">
             <CenterLinks />
-            <button
-              onClick={() => {
-                setOpen(false)
-                handleCTAClick()
-              }}
-              className="mt-2 rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] text-white px-5 py-3 text-sm font-semibold shadow-sm"
-            >
-              Get 24/7 support now
-            </button>
+            {!onDashboard && (
+              <button
+                onClick={() => {
+                  setOpen(false)
+                  handleCTAClick()
+                }}
+                className="mt-2 rounded-full bg-gradient-to-r from-[#FF7A1A] to-[#FF5B04] text-white px-5 py-3 text-sm font-semibold shadow-sm"
+              >
+                Get 24/7 support now
+              </button>
+            )}
           </div>
         </div>
       )}
