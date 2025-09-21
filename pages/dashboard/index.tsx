@@ -6,9 +6,8 @@ import { TOLLFREE_DISPLAY, CALLS_LIMIT, PER_CALL_MAX_MIN, SOFT_REMINDER_MIN } fr
 import { getBillingWindow, type BillingWindow } from '@/lib/billing'
 import { getMinutesUsed, getCallsUsed } from '@/lib/usage'
 
-// Use your Stripe portal login (magic link-style)
-const PORTAL_HREF = 'https://billing.stripe.com/p/login/5kA7tX49H7PNbAs288'
-const BUY_SLOT_HREF = PORTAL_HREF // upsell goes to same portal
+// Frontend now uses your existing POST /api/billing/portal (returns { url })
+const PORTAL_API = '/api/billing/portal'
 
 type Member = { id: string; name: string; phone: string; status?: string | null; created_at: string }
 type CallRow = { id: string; duration_seconds: number | null; started_at: string; issue_type?: string | null; phone?: string | null }
@@ -28,7 +27,7 @@ export default function Dashboard() {
   const [addPhone, setAddPhone] = useState('')
   const [addRelationship, setAddRelationship] = useState('')
 
-  // Layout polish: use solid white background for page area
+  // Make page background solid white (remove split bg)
   useEffect(() => {
     document.body.classList.add('bg-white')
     return () => document.body.classList.remove('bg-white')
@@ -84,17 +83,42 @@ export default function Dashboard() {
   }, [])
 
   const callPct = useMemo(() => Math.min(100, Math.round((callsUsed / Math.max(CALLS_LIMIT, 1)) * 100)), [callsUsed])
+  const perCallCap = `${PER_CALL_MAX_MIN} min cap • ${SOFT_REMINDER_MIN}-min reminder`
+  const hasAtLeastOneMember = members.length > 0
 
   async function handleLogout() {
     await supabase.auth.signOut()
     window.location.href = '/'
   }
 
+  // ---- Stripe portal helper: POST to your API with JWT and redirect to returned session.url
+  async function openStripePortal() {
+    try {
+      const { data: session } = await supabase.auth.getSession()
+      const token = session?.session?.access_token
+      if (!token) {
+        // ensure user is logged in (shouldn't happen on dashboard)
+        window.location.href = '/login'
+        return
+      }
+      const resp = await fetch(PORTAL_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      })
+      const json = await resp.json()
+      if (!resp.ok || !json?.url) throw new Error(json?.error || 'Portal error')
+      window.location.href = json.url // direct hop into Stripe portal (no email)
+    } catch (e) {
+      console.error(e)
+      alert('Could not open billing portal. Please try again.')
+    }
+  }
+
+  // First member: open confirm modal, then insert
   function openConfirm(e: React.FormEvent) {
     e.preventDefault()
     setShowConfirm(true)
   }
-
   async function confirmAddMember() {
     setShowConfirm(false)
     const { data: { user } } = await supabase.auth.getUser()
@@ -118,8 +142,6 @@ export default function Dashboard() {
     }
   }
 
-  const hasAtLeastOneMember = members.length > 0
-
   return (
     <>
       <Head>
@@ -140,10 +162,11 @@ export default function Dashboard() {
           )}
         </header>
 
-        {/* Layout per your sketch: Left column (support + members), Right column (account + usage) */}
+        {/* Layout: Left (support + members) | Right (account + usage) */}
         <section className="grid lg:grid-cols-[1.4fr_1fr] gap-6">
-          {/* LEFT: Support number card */}
+          {/* LEFT */}
           <div className="space-y-6">
+            {/* Support number card */}
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <div className="text-xs uppercase text-[#FF5B04] font-semibold tracking-wide mb-1">Your support number</div>
               <div className="text-3xl font-bold tracking-tight">{TOLLFREE_DISPLAY}</div>
@@ -167,7 +190,6 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold tracking-tight mt-1">24/7 support for approved numbers</h2>
               <p className="text-slate-600 mt-1">Only these numbers can call the toll-free line.</p>
 
-              {/* First-time form (only if no member yet). After one is added, form is hidden and button becomes Buy slot */}
               {!hasAtLeastOneMember ? (
                 <form onSubmit={openConfirm} className="border rounded-xl p-5 max-w-lg mt-4">
                   <input className="w-full border rounded-xl p-3 mb-3" placeholder="Full name" value={addName} onChange={e=>setAddName(e.target.value)} required />
@@ -193,16 +215,16 @@ export default function Dashboard() {
                     ))}
                   </div>
                   <div className="mt-4">
-                    <a href={BUY_SLOT_HREF} className="btn btn-primary">Buy another member slot</a>
+                    <button onClick={openStripePortal} className="btn btn-primary">Buy another member slot</button>
                   </div>
                 </>
               )}
             </div>
           </div>
 
-          {/* RIGHT: Account card + usage cards */}
+          {/* RIGHT */}
           <aside className="space-y-6">
-            {/* Account details / actions */}
+            {/* Account details */}
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <div className="text-xs uppercase text-[#FF5B04] font-semibold tracking-wide mb-1">Account</div>
               <div className="text-slate-700">
@@ -211,7 +233,7 @@ export default function Dashboard() {
                 ) : '—'}
               </div>
               <div className="flex gap-3 mt-3 flex-wrap">
-                <a href={PORTAL_HREF} target="_blank" rel="noreferrer" className="btn btn-light">Manage billing</a>
+                <button onClick={openStripePortal} className="btn btn-light">Manage billing</button>
                 <button onClick={handleLogout} className="inline-flex items-center rounded-md border border-slate-300 bg-white text-slate-700 px-3 py-2 text-sm font-semibold hover:bg-slate-50">Log out</button>
               </div>
             </div>
@@ -223,19 +245,19 @@ export default function Dashboard() {
               <div className="h-2 bg-slate-100 rounded mt-3">
                 <div className="h-2 rounded bg-gradient-to-r from-orange-400 to-orange-500" style={{ width: `${callPct}%` }} />
               </div>
-              <a href={BUY_SLOT_HREF} className="inline-block text-sm mt-3 text-[#FF5B04] font-semibold">Buy another member slot →</a>
+              <button onClick={openStripePortal} className="inline-block text-sm mt-3 text-[#FF5B04] font-semibold">Buy another member slot →</button>
             </div>
 
             {/* Minutes used */}
             <div className="bg-white border border-slate-200 rounded-xl p-5">
               <div className="text-xs uppercase text-[#FF5B04] font-semibold tracking-wide mb-1">Minutes used</div>
               <div className="text-2xl font-semibold">{minutesUsed}<span className="text-slate-500 text-base"> min</span></div>
-              <div className="text-slate-600 text-sm mt-1">{PER_CALL_MAX_MIN} min cap • {SOFT_REMINDER_MIN}-min reminder</div>
+              <div className="text-slate-600 text-sm mt-1">{perCallCap}</div>
             </div>
           </aside>
         </section>
 
-        {/* Recent activity (kept simple, solid white) */}
+        {/* Recent activity */}
         <section className="mt-8">
           <div className="text-xs uppercase text-[#FF5B04] font-semibold tracking-wide mb-2">Recent activity</div>
           <div className="grid gap-3">
