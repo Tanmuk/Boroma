@@ -11,9 +11,9 @@ export type BillingWindow = {
 
 export async function getBillingWindow(supabase: SupabaseClient): Promise<BillingWindow> {
   const { data: { user } } = await supabase.auth.getUser()
+  const now = new Date()
+
   if (!user) {
-    // caller should already gate auth, but keep a safe fallback
-    const now = new Date()
     const start = new Date(now.getFullYear(), now.getMonth(), 1)
     return { start, end: now, source: 'calendar_fallback' }
   }
@@ -27,8 +27,6 @@ export async function getBillingWindow(supabase: SupabaseClient): Promise<Billin
     .maybeSingle()
 
   if (error || !data?.current_period_start || !data?.current_period_end) {
-    // Fallback to calendar month if subscription row is not present yet
-    const now = new Date()
     const start = new Date(now.getFullYear(), now.getMonth(), 1)
     return { start, end: now, source: 'calendar_fallback' }
   }
