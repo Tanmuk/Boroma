@@ -1,5 +1,7 @@
 // /lib/mailer.ts
 import { Resend } from 'resend'
+export { sendCallSummaryEmail } from './email'
+
 
 const resend = new Resend(process.env.RESEND_API_KEY as string)
 const FROM = 'Boroma <hello@boroma.site>'
