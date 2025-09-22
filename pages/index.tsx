@@ -59,7 +59,7 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[220px] bg-[#075056]" />
         <div className="container relative z-10 mx-auto px-4 pt-16 md:pt-24 pb-12 text-center">
           <div className="inline-flex items-center text-xs uppercase tracking-wide font-semibold px-3 py-1 rounded-full bg-[#FCDD9D] text-[#FF5B04]">
-            Launch offer: Use code LAUNCH40 to get 40% off
+            Launch offer: Use code LAUNCH40 for 40% off
           </div>
 
           <h1
@@ -69,7 +69,7 @@ export default function Home() {
               fontSize: 'clamp(34px, 6vw, 60px)',
             }}
           >
-            On-demand, 24/7 tech help, with the patience your loved ones deserve
+            On-demand, 24/7 tech help with the patience your loved ones deserve
           </h1>
 
           <p className="mx-auto text-slate-600 mt-4 max-w-[650px]">
@@ -266,13 +266,13 @@ export default function Home() {
 
             <ol className="grid gap-4 w-full max-w-[560px]">
               {[
-                ['Step 1: Your Parent Calls', 'Just one number to remember: Toll Free number. No apps, no accounts, no passwords.'],
-                ['Step 2: Patient Help in Their Language', 'Our agents listen carefully, explain clearly, and work at your parent’s pace.'],
-                ['Step 3: You Stay Informed', 'Get a text summary of what happened, what was fixed, and any follow-up needed.'],
+                ['Your Parent Calls', 'Just one TOLL-FREE number to remember. No apps, no accounts, no passwords.'],
+                ['Patient Help in Their Language', 'Our agents listen carefully, explain clearly, and work at your parent’s pace.'],
+                ['You Stay Informed', 'Get a text summary of what happened, what was fixed, and any follow-up needed.'],
               ].map(([h, d], i) => (
                 <li key={i} className="bg-white border border-slate-200 rounded-2xl p-5">
                   <div className="flex items-start gap-3">
-                    <span className="w-8 h-8 rounded-full bg-[#FFEDD9] text-[#FF5B04] grid place-content-center font-semibold">{`0${i + 1}`}</span>
+                    <span className="w-10 h-8 rounded-full bg-[#FFEDD9] text-[#FF5B04] grid place-content-center font-semibold">{`0${i + 1}`}</span>
                     <div>
                       <div className="font-semibold">{h}</div>
                       <div className="text-slate-600 mt-1">{d}</div>
@@ -374,7 +374,7 @@ export default function Home() {
               img="/Jennifer.png"
               name="Jennifer L."
               location="Miami"
-              quote="Mom was getting scam calls pretending to be tech support. Boroma agents taught her how to identify fake calls and now she feels confident. The family summaries help me stay involved without hovering."
+              quote="I was frustrated with the scam calls my mom was getting pretending to be tech support. Boroma agents taught her how to identify fake calls and now she feels confident. The family summaries help me stay involved without hovering."
             />
           </div>
         </div>
@@ -401,7 +401,7 @@ export default function Home() {
                   <div className="text-2xl font-semibold mt-1">{annual ? 'Annual' : 'Monthly'}</div>
                 </div>
                 <label className="inline-flex items-center gap-3 text-sm select-none">
-                  <span>Save 40% with annual plan instead</span>
+                  <span>Save the 40% with annual plan instead</span>
                   <button
                     type="button"
                     onClick={() => setAnnual(a => !a)}
@@ -422,13 +422,13 @@ export default function Home() {
 
               <ul className="mt-4 space-y-2 text-slate-700">
                 <li>• 24/7 phone first tech help</li>
-                <li>• Up to 10 calls per month, 35 minutes each</li>
+                <li>• Up to 10 calls per month, 35 mins each</li>
                 <li>• Toll free number for paid members</li>
                 <li>• Fridge magnet print</li>
                 <li>• Call report after each call</li>
                 <li>• Scam aware guidance & guardrails</li>
                 <li>• Covers common issues on any device</li>
-                <li>• Multilingual — English, Spanish, Chinese</li>
+                <li>• Multilingual: English, Spanish, Chinese</li>
                 <li>• Works on any phone, no apps</li>
               </ul>
 
@@ -471,7 +471,7 @@ export default function Home() {
                 <div className="mt-3">Available for both <strong>MONTHLY</strong> &amp; <strong>ANNUALLY</strong></div>
 
                 <div className="mt-5 text-xs opacity-90 leading-relaxed">
-                  ⏰ This pricing ends October 15th, 2025. New members after this date pay $29/month or $348/year.
+                  ⏰ This pricing ends September 30th, 2025. New members after this date pay $29/month or $348/year.
                 </div>
               </div>
             </aside>
@@ -667,7 +667,7 @@ const FAQS = [
   },
   {
     q: "What if my parent doesn't speak English well?",
-    a: 'Perfect! Our agents speak English, Spanish, and Chinese fluently and can switch mid-conversation.',
+    a: 'No problem. Our agents speak English, Spanish, and Chinese fluently and can switch mid-conversation.',
   },
   {
     q: 'Will they ask for passwords or access to devices?',
@@ -679,7 +679,7 @@ const FAQS = [
   },
   {
     q: 'How do I know what happened during the call?',
-    a: 'You receive a detailed text summary within minutes of each call ending.',
+    a: 'You receive a detailed text summary via within seconds of each call ending.',
   },
   {
     q: 'Can I get recordings of the calls?',
@@ -691,7 +691,7 @@ const FAQS = [
   },
   {
     q: 'How quickly can someone answer?',
-    a: 'Typically under 2 minutes, 24/7.',
+    a: 'Typically within 15 seconds, 24/7.',
   },
 ]
 
